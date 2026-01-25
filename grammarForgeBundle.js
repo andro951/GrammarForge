@@ -19,10 +19,23 @@
     'grammarForge/functionDeclaration.js'
   ];
 
-  files.forEach(file => {
+  function loadNext(index, callback) {
+    if (index >= files.length) {
+      if (callback) callback();
+      return;
+    }
+
     const script = document.createElement('script');
-    script.src = file;  // relative to HTML file
-    script.defer = false;
+    script.src = files[index];
+    script.onload = () => loadNext(index + 1, callback);
     document.head.appendChild(script);
+  }
+
+  // Start loading all scripts in order
+  loadNext(0, () => {
+    console.log('GrammarForge fully loaded');
+    // Optional: you can fire a global event here
+    const evt = new Event('GrammarForgeLoaded');
+    window.dispatchEvent(evt);
   });
 })();
