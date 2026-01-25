@@ -1,3 +1,5 @@
+const LIB_VERSION = '1.0.0';
+
 (function() {
   const files = [
     'grammarForge/grammarForge.js',
@@ -28,9 +30,8 @@
     }
 
     const script = document.createElement('script');
-
-    // Append a timestamp to bust the cache
-    script.src = files[index] + '?_ts=' + Date.now();
+    // Append version to trigger fetch if updated
+    script.src = files[index] + '?v=' + LIB_VERSION;
     script.onload = () => loadNext(index + 1, callback);
     document.head.appendChild(script);
   }
