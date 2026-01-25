@@ -1,40 +1,39 @@
 const LIB_VERSION = '1.0.0';
+const BASE_URL = 'https://andro951.github.io/GrammarForge/';
 
-(function() {
-  const files = [
-    'grammarForge/grammarForge.js',
-    'grammarForge/token.js',
-    'grammarForge/tokenDefinition.js',
-    'grammarForge/lexer.js',
-    'grammarForge/parser.js',
-    'grammarForge/exec.js',
-    'grammarForge/tokenStream.js',
-    'grammarForge/grammarLexer.js',
-    'grammarForge/grammarParser.js',
-    'grammarForge/grammarParser/functions.js',
-    'grammarForge/grammarParser/expression.js',
-    'grammarForge/grammarParser/word.js',
-    'grammarForge/grammarParser/par.js',
-    'grammarForge/grammarParser/rule.js',
-    'grammarForge/grammarParser/term.js',
-    'grammarForge/flowControl.js',
-    'grammarForge/functionDeclaration.js'
-  ];
+const files = [
+  'grammarForge/grammarForge.js',
+  'grammarForge/token.js',
+  'grammarForge/tokenDefinition.js',
+  'grammarForge/lexer.js',
+  'grammarForge/parser.js',
+  'grammarForge/exec.js',
+  'grammarForge/tokenStream.js',
+  'grammarForge/grammarLexer.js',
+  'grammarForge/grammarParser.js',
+  'grammarForge/grammarParser/functions.js',
+  'grammarForge/grammarParser/expression.js',
+  'grammarForge/grammarParser/word.js',
+  'grammarForge/grammarParser/par.js',
+  'grammarForge/grammarParser/rule.js',
+  'grammarForge/grammarParser/term.js',
+  'grammarForge/flowControl.js',
+  'grammarForge/functionDeclaration.js'
+].map(f => BASE_URL + f + '?v=' + LIB_VERSION);
 
-  function loadNext(index, callback) {
-    if (index >= files.length) {
-      if (callback) callback();
-      const evt = new Event('GrammarForgeLoaded');
-      window.dispatchEvent(evt);
-      return;
-    }
-
-    const script = document.createElement('script');
-    // Append version to trigger fetch if updated
-    script.src = files[index] + '?v=' + LIB_VERSION;
-    script.onload = () => loadNext(index + 1, callback);
-    document.head.appendChild(script);
+(function loadNext(index) {
+  if (index >= files.length) {
+    const evt = new Event('GrammarForgeLoaded');
+    window.dispatchEvent(evt);
+    console.log('GrammarForge fully loaded');
+    return;
   }
 
-  loadNext(0);
-})();
+  const script = document.createElement('script');
+  script.src = files[index];
+  script.onload = () => loadNext(index + 1);
+  script.onerror = () => {
+    console.error('Failed to load GrammarForge script:', files[index]);
+  };
+  document.head.appendChild(script);
+})(0);
