@@ -1,0 +1,225 @@
+"use strict";
+
+{
+    GrammarForge.Parser = class Parser {
+        constructor(rules, lexer) {
+            this.rules = rules;
+            this.lexer = lexer;
+            this.tokens = [];
+            this.checkDuplicateRuleNames();
+            this.tokenTags = new Map();
+            for (let tokenDef of this.lexer.tokenDefinitions) {
+                this.tokenTags.set(tokenDef.type, tokenDef.tag);
+            }
+
+            this.createRuleMaps();
+
+            for (const rule of this.rules) {
+                rule.computeLookaheadSetAndFreeze(this);
+            }
+
+            Object.freeze(this.rules);
+            
+            this.createRuleParseFunctions();
+        }
+
+        checkDuplicateRuleNames = () => {
+            const ruleNames = new Set();
+            for (const rule of this.rules) {
+                if (ruleNames.has(rule.name))
+                    throw new Error(`Duplicate rule name: ${rule.name}`);
+
+                ruleNames.add(rule.name);
+            }
+        }
+
+        createRuleMaps = () => {
+            this.ruleIndexLookup = new Map();//Map<ruleName, ruleIndex>; ruleIndexLookup.get(ruleName) => ruleIndex
+            for (let i = 0; i < this.rules.length; i++) {
+                const rule = this.rules[i];
+                this.ruleIndexLookup.set(rule.name, i);
+            }
+
+            this.expressionIndexLookup = [];//Array of maps<expressionString, expressionIndex>; expressionIndexLookup[ruleIndex].get(expressionString) => expressionIndex
+            for (let i = 0; i < this.rules.length; i++) {
+                this.expressionIndexLookup.push(new Map());
+                for (let j = 0; j < this.rules[i].expressions.length; j++) {
+                    const expression = this.rules[i].expressions[j];
+                    this.expressionIndexLookup[i].set(expression.expressionString, j);
+                }
+            }
+
+            Object.freeze(this.ruleIndexLookup);
+            Object.freeze(this.expressionIndexLookup);
+
+            this.ruleTagLookup = new Map();
+            for (let i = 0; i < this.rules.length; i++) {
+                const rule = this.rules[i];
+                if (rule.tag !== null) {
+                    if (this.ruleTagLookup.has(rule.tag))
+                        throw new Error(`Duplicate tag found, tag: ${rule.tag} on rules ${this.ruleTagLookup.get(rule.tag).name} and ${rule.name}`);
+
+                    this.ruleTagLookup.set(rule.tag, rule);
+                }
+            }
+
+            this.metaExpressionLookup = new Map();
+            for (let i = 0; i < this.rules.length; i++) {
+                const rule = this.rules[i];
+                for (let j = 0; j < rule.expressions.length; j++) {
+                    const expression = rule.expressions[j];
+                    const tag = expression.tag;
+                    if (tag !== null) {
+                        if (!this.metaExpressionLookup.has(tag))
+                            this.metaExpressionLookup.set(tag, []);
+
+                        this.metaExpressionLookup.get(tag).push([rule, expression]);
+                    }
+                }
+            }
+
+            Object.freeze(this.metaExpressionLookup);
+
+            const expRule = this.ruleTagLookup.get("exp");
+            if (expRule) {
+                const expRules = new Set([expRule.index]);
+                expRule.getChildren(this, expRules);
+                for (const ruleIndex of expRules) {
+                    this.rules[ruleIndex].isExpRule = true;
+                }
+            }
+        }
+
+        getRule = (ruleName) => {
+            const ruleIndex = this.ruleIndexLookup.get(ruleName);
+            if (ruleIndex === undefined)
+                throw new Error(`No rule found with name: ${ruleName}`);
+
+            return this.rules[ruleIndex];
+        }
+
+        createRuleParseFunctions = () => {
+            this.ruleFunctions = Array(this.rules.length).fill(null);
+            this.ruleTryFunctions = Array(this.rules.length).fill(null);
+            this.ruleSubFunctions = [];
+            this.ruleSubFunctionKeys = [];
+            this.ruleSubFunctionLookup = new Map();//Needs to stay as Map<expressionString, subFunctionIndex> because expressions can be either an indexed expression of a rule, or an indexed expression inside parentheses inside another expression.
+            this.ruleTrySubFunctions = [];
+            this.ruleTrySubFunctionKeys = [];
+            this.ruleTrySubFunctionLookup = new Map();//Needs to stay as Map<expressionString, subFunctionIndex> because expressions can be either an indexed expression of a rule, or an indexed expression inside parentheses inside another expression.
+            const firstRule = this.rules[0];
+            firstRule.createParseFunctions(this);
+            for (let i = 1; i < this.rules.length; i++) {
+                const rule = this.rules[i];
+                rule.createParseFunctions(this);
+            }
+        }
+
+        addSubFunction = (funcKey, func) => {
+            if (this.ruleSubFunctionLookup.has(funcKey))
+                throw new Error(`Sub function with key ${funcKey} already exists.`);
+
+            if (!funcKey)
+                throw new Error("Function key is required to add sub function.");
+            
+            const index = this.ruleSubFunctions.length;
+            this.ruleSubFunctions.push(func.bind(this));
+            this.ruleSubFunctionKeys.push(funcKey);
+            this.ruleSubFunctionLookup.set(funcKey, index);
+            return index;
+        }
+
+        addTrySubFunction = (funcKey, func) => {
+            if (this.ruleTrySubFunctionLookup.has(funcKey))
+                throw new Error(`Try sub function with key ${funcKey} already exists.`);
+
+            if (!funcKey)
+                throw new Error("Function key is required to add try sub function.");
+
+            const index = this.ruleTrySubFunctions.length;
+            this.ruleTrySubFunctions.push(func.bind(this));
+            this.ruleTrySubFunctionKeys.push(funcKey);
+            this.ruleTrySubFunctionLookup.set(funcKey, index);
+            return index;
+        }
+
+        parse = (str) => {
+            this.tokens = this.lexer.tokenize(str);
+            this.tokenStream = new GrammarForge.TokenStream(this.tokens);
+            const ast = this.ruleFunctions[0](this.tokenStream);
+            if (!this.tokenStream.end())
+                throw new Error("Unexpected tokens at end of input.");
+            
+            return ast;
+        }
+
+        token = (tokenStream, tokenType) => {
+            const token = tokenStream.currentToken();
+            if (token.type !== tokenType)
+                throw new Error(`Expected ${tokenType} token, found ${tokenStream.currentToken().type}`);
+
+            tokenStream.match(tokenType);
+            return this.tokenToAST(token);
+        }
+
+        try_token = (tokenStream, tokenType) => {
+            const token = tokenStream.tryCurrentToken();
+            if (!token)
+                return null;
+            
+            if (!tokenStream.tryMatch(tokenType))
+                return null;
+
+            return this.tokenToAST(token);
+        }
+
+        tokenToAST = (token) => {
+            const tag = this.tokenTags.get(token.type);
+            switch (tag) {
+                case 'int':
+                    return ['TOKEN', token.type, parseInt(token.value)];
+                case 'float':
+                    //TODO: if parseFloat fails because the number is too big, parse BigNum instead.
+                    return ['TOKEN', token.type, parseFloat(token.value)];
+                case 'bool':
+                    return ['TOKEN', token.type, token.value === 'true'];
+                case 'string':
+                    const s = token.value.substring(1, token.value.length - 1);
+                    return ['TOKEN', token.type, s];
+                case null:
+                    return ['TOKEN', token.type, token.value];
+                default:
+                    throw new Error(`Unknown token tag: ${token.tag}`);
+            }
+        }
+
+        symbol = (tokenStream, symbol) => {
+            const token = tokenStream.currentToken();
+            if (token.type !== 'SYMBOL')
+                throw new Error(`Expected SYMBOL token '${symbol}', found ${tokenStream.currentToken().type}`);
+
+            if (token.value !== symbol)
+                throw new Error(`Expected symbol '${symbol}', found '${token.value}'`);
+
+            tokenStream.match('SYMBOL');
+            return [`SYMBOL`, token.value];
+        }
+
+        try_symbol = (tokenStream, symbol) => {
+            const token = tokenStream.tryCurrentToken();
+            if (!token)
+                return null;
+
+            if (token.type !== 'SYMBOL')
+                return null;
+
+            if (token.value !== symbol)
+                return null;
+
+            if (!tokenStream.tryMatch('SYMBOL'))
+                return null;
+
+            return [`SYMBOL`, token.value];
+        }
+    }
+}
