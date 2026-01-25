@@ -22,20 +22,18 @@
   function loadNext(index, callback) {
     if (index >= files.length) {
       if (callback) callback();
+      const evt = new Event('GrammarForgeLoaded');
+      window.dispatchEvent(evt);
       return;
     }
 
     const script = document.createElement('script');
-    script.src = files[index];
+
+    // Append a timestamp to bust the cache
+    script.src = files[index] + '?_ts=' + Date.now();
     script.onload = () => loadNext(index + 1, callback);
     document.head.appendChild(script);
   }
 
-  // Start loading all scripts in order
-  loadNext(0, () => {
-    console.log('GrammarForge fully loaded');
-    // Optional: you can fire a global event here
-    const evt = new Event('GrammarForgeLoaded');
-    window.dispatchEvent(evt);
-  });
+  loadNext(0);
 })();
