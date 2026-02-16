@@ -1,17 +1,21 @@
 "use strict";
 
 /*
-grammar : (stmt)+
+grammar : stmt+
 stmt    : rule | tknDef
-rule    : IDENTIFIER (LBRACE IDENTIFIER RBRACE)? DEFINED_AS exp (ORBAR exp)*
-exp     : (word)+ (LBRACE IDENTIFIER (IDENTIFIER | INT | TOKEN)* RBRACE)?
+rule    : IDENTIFIER (LBRACE IDENTIFIER RBRACE)? DEFINED_AS expList
+expList : exp (ORBAR exp)*
+exp     : wordBase+ (LBRACE IDENTIFIER (IDENTIFIER | INT | TOKEN)* RBRACE)?
+wordBase: word
+        | qWord
 word    : term
         | par
+qWord   : word oType
 term    : IDENTIFIER 
         | TOKEN
         | SYMBOL
-par     : LPAREN exp RPAREN (parType)?
-parType : QUESTION
+par     : LPAREN expList RPAREN
+oType   : QUESTION
         | STAR
         | PLUS
 tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTIFIER) RPAREN))?
@@ -53,7 +57,7 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
             }
         }
 
-        //grammar : (stmt)+
+        //grammar : stmt+
         static grammar() {
             if (GrammarParser.tokens.length === 0)
                 throw new Error("No tokens to parse");
@@ -69,8 +73,8 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
         static tknDefSet = ["TOKEN"];
         static termSet = ["IDENTIFIER", "TOKEN", "SYMBOL"];
         static parSet = ["LPAREN"];
+        static oTypeSet = ["QUESTION", "STAR", "PLUS"];
         static wordSet = GrammarParser.termSet.concat(GrammarParser.parSet);
-        static expSet = GrammarParser.wordSet;
 
         //stmt    : rule | tknDef
         static stmt() {
@@ -86,11 +90,10 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
             }
         }
 
-        //rule    : IDENTIFIER (LBRACE IDENTIFIER RBRACE)? DEFINED_AS exp (ORBAR exp)*
+        //rule    : IDENTIFIER (LBRACE IDENTIFIER RBRACE)? DEFINED_AS expList
         static rule() {
             const token = GrammarParser.tokens[GrammarParser.index];
             const tokenName = token.value;
-            let expressions = [];
             GrammarParser.match("IDENTIFIER");
             let tag = null;
             if (GrammarParser.tryMatch("LBRACE")) {
@@ -101,26 +104,41 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
             }
 
             GrammarParser.match("DEFINED_AS");
-            let index = 0;
-            const exp = GrammarParser.exp(index++);
-            expressions.push(exp);
-            while (GrammarParser.index < GrammarParser.tokens.length && GrammarParser.tokens[GrammarParser.index].type === "ORBAR") {
-                GrammarParser.match("ORBAR");
-                const exp2 = GrammarParser.exp(index++);
-                expressions.push(exp2);
-            }
 
-            const rule = new GrammarForge.Rule(tokenName, expressions, GrammarParser.rules.length, tag);
+            const expList = GrammarParser.expList(true);
+
+            const rule = new GrammarForge.Rule(tokenName, expList, GrammarParser.rules.length, tag);
             GrammarParser.rules.push(rule);
         }
 
-        //exp     : (word)+ (LBRACE IDENTIFIER (IDENTIFIER | INT | TOKEN)* RBRACE)?
-        static exp(index) {
+        //expList : exp (ORBAR exp)*
+        static expList(metaDataAllowed) {
+            if (metaDataAllowed === undefined)
+                throw new Error(`expList: metaDataAllowed parameter is required.`);
+
+            let expressions = [];
+            let index = 0;
+            const exp = GrammarParser.exp(index++, metaDataAllowed);
+            expressions.push(exp);
+            while (GrammarParser.index < GrammarParser.tokens.length && GrammarParser.tokens[GrammarParser.index].type === "ORBAR") {
+                GrammarParser.match("ORBAR");
+                const exp2 = GrammarParser.exp(index++, metaDataAllowed);
+                expressions.push(exp2);
+            }
+            
+            return new GrammarForge.ExpList(expressions);
+        }
+
+        //exp     : wordBase+ (LBRACE IDENTIFIER (IDENTIFIER | INT | TOKEN)* RBRACE)?
+        static exp(index, metaDataAllowed) {
+            if (metaDataAllowed === undefined)
+                throw new Error(`exp: metaDataAllowed parameter is required.`);
+
             const words = [];
             while (GrammarParser.index < GrammarParser.tokens.length) {
                 const token = GrammarParser.tokens[GrammarParser.index];
                 if (GrammarParser.wordSet.includes(token.type)) {
-                    const word = GrammarParser.word();
+                    const word = GrammarParser.wordBase();
                     if (word === undefined)
                         break;//word returns undefined if it sees a rule definition next.
 
@@ -130,9 +148,16 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
                 }
             }
 
+            if (words.length === 0) {
+                throw new Error(`Expected at least one word in expression at index ${GrammarParser.index}`);
+            }
+
             let metadata = [];
             if (GrammarParser.index < GrammarParser.tokens.length) {
                 if (GrammarParser.tryMatch("LBRACE")) {
+                    if (!metaDataAllowed)
+                        throw new Error(`Metadata not allowed in this expression at index ${GrammarParser.index}`);
+
                     const token = GrammarParser.tokens[GrammarParser.index];
                     if (token.type !== "IDENTIFIER" && token.type !== 'SYMBOL' && token.type !== "PLUS" && token.type !== "STAR")
                         throw new Error(`Unexpected token type in expression metadata: ${token.type}`);
@@ -141,7 +166,10 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
                     metadata.push(token.value);
                     while (!GrammarParser.tryMatch("RBRACE")) {
                         const token = GrammarParser.tokens[GrammarParser.index];
-                        GrammarParser.match('IDENTIFIER');
+                        if (token.type !== 'IDENTIFIER' && token.type !== 'INT' && token.type !== "TOKEN")
+                            throw new Error(`Unexpected token type in expression metadata: ${token.type}`);
+
+                        GrammarParser.match(token.type);
                         metadata.push(token.value);
                     }
                 }
@@ -150,8 +178,33 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
             return new GrammarForge.Expression(words, index, metadata);
         }
 
-        //word    : term
-        //        | par
+        // wordBase: word
+        // | qWord
+        // qWord   : word oType
+        static wordBase() {
+            const wordNResult = GrammarParser.word();
+            if (wordNResult === undefined)
+                return undefined;
+
+            if (GrammarParser.index < GrammarParser.tokens.length) {
+                const token = GrammarParser.tokens[GrammarParser.index];
+                if (GrammarParser.oTypeSet.includes(token.type)) {
+                    GrammarParser.match(token.type);
+                    if (GrammarParser.index < GrammarParser.tokens.length) {
+                        const nextToken = GrammarParser.tokens[GrammarParser.index];
+                        if (GrammarParser.oTypeSet.includes(nextToken.type))
+                            throw new Error(`Multiple oTypes in wordO are not allowed.`);
+                    }
+
+                    return new GrammarForge.QWord(wordNResult, token.type);
+                }
+            }
+
+            return wordNResult;
+        }
+
+        // word    : term
+        // | par
         static word() {
             const token = GrammarParser.tokens[GrammarParser.index];
             if (GrammarParser.termSet.includes(token.type)) {
@@ -196,22 +249,13 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
             }
         }
 
-        //par     : LPAREN exp RPAREN (parType)?
-        //parType : QUESTION
-        //        | STAR
-        //        | PLUS
+        //par     : LPAREN expList RPAREN
         static par() {
             GrammarParser.match("LPAREN");
-            const exp = GrammarParser.exp(0);
+            const expList = GrammarParser.expList(false);
             GrammarParser.match("RPAREN");
-            const token = GrammarParser.tokens[GrammarParser.index];
-            let parType = null;
-            if (token.type === "QUESTION" || token.type === "STAR" || token.type === "PLUS") {
-                GrammarParser.match(token.type);
-                parType = token.type;
-            }
-
-            return new GrammarForge.Par(exp, parType);
+            
+            return new GrammarForge.Par(expList);
         }
 
         //tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTIFIER) RPAREN))?

@@ -43,8 +43,8 @@
             this.expressionIndexLookup = [];//Array of maps<expressionString, expressionIndex>; expressionIndexLookup[ruleIndex].get(expressionString) => expressionIndex
             for (let i = 0; i < this.rules.length; i++) {
                 this.expressionIndexLookup.push(new Map());
-                for (let j = 0; j < this.rules[i].expressions.length; j++) {
-                    const expression = this.rules[i].expressions[j];
+                for (let j = 0; j < this.rules[i].expList.expressions.length; j++) {
+                    const expression = this.rules[i].expList.expressions[j];
                     this.expressionIndexLookup[i].set(expression.expressionString, j);
                 }
             }
@@ -66,8 +66,8 @@
             this.metaExpressionLookup = new Map();
             for (let i = 0; i < this.rules.length; i++) {
                 const rule = this.rules[i];
-                for (let j = 0; j < rule.expressions.length; j++) {
-                    const expression = rule.expressions[j];
+                for (let j = 0; j < rule.expList.expressions.length; j++) {
+                    const expression = rule.expList.expressions[j];
                     const tag = expression.tag;
                     if (tag !== null) {
                         if (!this.metaExpressionLookup.has(tag))
@@ -145,6 +145,11 @@
 
         parse = (str) => {
             this.tokens = this.lexer.tokenize(str);
+            return this.parseTokens(this.tokens);
+        }
+
+        parseTokens = (tokens) => {
+            this.tokens = tokens;
             this.tokenStream = new GrammarForge.TokenStream(this.tokens);
             const ast = this.ruleFunctions[0](this.tokenStream);
             if (!this.tokenStream.end())

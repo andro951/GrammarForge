@@ -1,12 +1,12 @@
 "use strict";
 
 GrammarForge.Rule = class Rule {
-    constructor(name, expressions, index, tag = null) {
+    constructor(name, expList, index, tag = null) {
         if (!name)
             throw new Error("name is required");
 
-        if (!Array.isArray(expressions))
-            throw new Error("expressions must be an array");
+        if (!(expList instanceof GrammarForge.ExpList))
+            throw new Error("expList must be a GrammarForge.ExpList");
 
         if (index === undefined || index === null || typeof index !== 'number' || index < 0)
             throw new Error("index must be a non-negative number");
@@ -15,7 +15,7 @@ GrammarForge.Rule = class Rule {
             throw new Error("tag must be a string or null");
 
         this.name = name;
-        this.expressions = expressions;
+        this.expList = expList;
         this.index = index;
         this.tag = tag;
         this.checkTagAndExpressionsMetadata();
@@ -26,42 +26,19 @@ GrammarForge.Rule = class Rule {
         if (this.lookaheadSet)
             return this.lookaheadSet;
 
-        this.lookaheadSets = [];
-        for (const expr of this.expressions) {
-            const set = expr.computeLookaheadSetAndFreeze(parser);
-            if (!Object.isFrozen(set))
-                throw new Error("Lookahead set not frozen");
-                
-            this.lookaheadSets.push(set);
-        }
+        this.lookaheadSet = this.expList.computeLookaheadSetAndFreeze(parser);
+        if (!Object.isFrozen(this.lookaheadSet))
+            throw new Error("Lookahead set not frozen");
 
-        Object.freeze(this.lookaheadSets);
-
-        this.lookaheadSet = new Set();
-        for (const laSet of this.lookaheadSets) {
-            for (const token of laSet) {
-                this.lookaheadSet.add(token);
-            }
-        }
-
-        Object.freeze(this.lookaheadSet);
         Object.freeze(this);
 
-        return this.lookaheadSet;
-    }
-
-    getLookaheadSets() {
-        return this.lookaheadSets;
-    }
-
-    getLookaheadSet() {
         return this.lookaheadSet;
     }
 
     checkTagAndExpressionsMetadata = () => {
         this.checkTag();
         const tag = this.tag;
-        for (const expr of this.expressions) {
+        for (const expr of this.expList.expressions) {
             expr.checkMetadata(this);
         }
 
@@ -71,24 +48,56 @@ GrammarForge.Rule = class Rule {
     }
 
     checkLeftRecursion = () => {
-        for (const expr of this.expressions) {
-            this.checkWordsForLeftRecursion(expr);
+        for (const expr of this.expList.expressions) {
+            if (!this.checkWordsForLeftRecursion(expr))
+                throw new Error(`All words in expression are optional: ${expr.expressionString} in rule: ${this.name}.  There must be at least 1 non-optional word in each expression.`);
         }
     }
 
-    checkWordsForLeftRecursion = (expr) => {
-        for (const word of expr.words) {
-            if (word instanceof GrammarForge.Term) {
-                if (word.type === "IDENTIFIER" && word.value === this.name) {
-                    throw new Error(`Left recursion detected in rule: ${this.name}, expression: ${expr.expressionString}.  The parser is a LL1 recursive desent parser with backtracking. Left recursion is not supported.  Left recursion means the first non-optional word in an expression is the same as the rule name.`);
-                }
+    //Returns true if left recursion was checked and not found
+    //Throws an error if left recursion is found
+    //Returns false if this word was not a match, but is optional
+    checkWordForLeftRecursion = (word, expr) => {
+        if (word instanceof GrammarForge.Term) {
+            if (word.type === "IDENTIFIER" && word.value === this.name) {
+                throw new Error(`Left recursion detected in rule: ${this.name}, expression: ${expr.expressionString}.  The parser is a LL1 recursive desent parser with backtracking. Left recursion is not supported.  Left recursion means the first non-optional word in an expression is the same as the rule name.`);
+            }
 
-                return true;//Found and checked the first non-optional word
+            return true;//Found and checked the first non-optional word
+        }
+        else if (word instanceof GrammarForge.QWord) {
+            const checked = this.checkWordForLeftRecursion(word.word, expr);
+            if (checked)
+                return true;
+
+            if (word.oType === 'PLUS')
+                return true;
+
+            return false;
+        }
+        else if (word instanceof GrammarForge.Par) {
+            let allChecked = true;
+            //Need to check all expressions inside the par in case they allow left recursion.
+            for (let i = 0; i < word.expList.expressions.length; i++) {
+                const expr = word.expList.expressions[i];
+                const checked = this.checkWordsForLeftRecursion(expr);
+                if (!checked)
+                    allChecked = false;
             }
-            else if (word instanceof GrammarForge.Par) {
-                if (this.checkWordsForLeftRecursion(word.expression))
-                    return true;//Found and checked the first non-optional word
-            }
+
+            //If any of the expressions in the Par are all optional, then the Par is optional, and shouldn't stop looking for left recursion.
+            return allChecked;
+        }
+
+        throw new Error(`Unknown word type in rule: ${this.name}, expression: ${expr.expressionString}.  Word: ${word.string}`);
+    }
+
+    checkWordsForLeftRecursion = (expr) => {
+        //The goal is to find the first non-optional word, or the first optional word that is this rule
+        for (const word of expr.words) {
+            const checked = this.checkWordForLeftRecursion(word, expr);
+            if (checked)
+                return true;
         }
 
         return false;
@@ -103,8 +112,8 @@ GrammarForge.Rule = class Rule {
 
         if (!GrammarForge.Expression.tags.has(this.tag)) {
             if (GrammarForge.Expression.operatorTags.has(this.tag)) {
-                if (this.expressions.length === 1) {
-                    const expression = this.expressions[0];
+                if (this.expList.expressions.length === 1) {
+                    const expression = this.expList.expressions[0];
                     if (expression.words.length === 1) {
                         if (expression.metadata.length === 0) {
                             expression.metadata.push(this.tag);
@@ -125,7 +134,7 @@ GrammarForge.Rule = class Rule {
 
         const tag = this.tag;
         this.tag = null;
-        for (const expr of this.expressions) {
+        for (const expr of this.expList.expressions) {
             if (expr.metadata.length !== 0)
                 throw new Error(`${tag} was placed on rule: ${this.name}, but it is an expression tag.  Expression: ${expr.expressionString} already has a tag, ${expr.metadata[0]}.  An expression cannot have multiple tags.`);
 
@@ -139,80 +148,20 @@ GrammarForge.Rule = class Rule {
         if (parser.ruleFunctions[this.index] !== null)
             throw new Error(`Parse function already exists for rule index ${this.index}`);
 
-        let func;
-        let tryFunc;
-        switch (this.expressions.length) {
-            case 0:
-                throw new Error(`Rule ${this.name} has no expressions`);
-            case 1:
-                const expression = this.expressions[0];
-                const expressionParse = expression.getParseFunc(parser);
-                const expressionString = expression.expressionString;
-                func = (tokenStream) => {
-                    //const result = [this.name];
-                    const result = [];
-                    expressionParse(tokenStream, result);
-                    //return result;
-                    return [ this.name, result, [ 'EXPRESSION', 0, expressionString ] ];
-                }
+        const expListParseFunc = this.expList.getParseFunc(parser);
+        const func = (tokenStream) => {
+            const result = expListParseFunc(tokenStream);
 
-                const expressionTryParse = expression.getTryParseFunc(parser);
-                tryFunc = (tokenStream) => {
-                    //const result = [this.name];
-                    const result = [];
-                    const clonedStream = tokenStream.clone();
-                    const tryParseResult = expressionTryParse(clonedStream, result);
-                    if (!tryParseResult)
-                        return null;
+            return [ this.name, result ];
+        }
 
-                    tokenStream.index = clonedStream.index;
-                    //return result;
-                    return [ this.name, result, [ 'EXPRESSION', 0, expressionString ] ];
-                }
-                break;
-            default:
-                const expressionTryParseFuncs = [];
-                const expressionStrings = [];
-                const expressionLookaheadSets = [];
-                for (let i = 0; i < this.expressions.length; i++) {
-                    //expressionTryParseFuncs.push(this.expressions[i].getTryParseFuncSubArr(parser));
-                    expressionTryParseFuncs.push(this.expressions[i].getTryParseFunc(parser));
-                    expressionStrings.push(this.expressions[i].expressionString);
-                    expressionLookaheadSets.push(this.expressions[i].getLookaheadSet());
-                }
+        const expListTryParseFunc = this.expList.getTryParseFunc(parser);
+        const tryFunc = (tokenStream) => {
+            const tryResult = expListTryParseFunc(tokenStream);
+            if (!tryResult)
+                return null;
 
-                func = (tokenStream) => {
-                    const token = tokenStream.currentToken();
-                    for (let i = 0; i < this.expressions.length; i++) {
-                        if (!expressionLookaheadSets[i].has(token.type))
-                            continue;
-
-                        const result = [];
-                        const tryParseResult = expressionTryParseFuncs[i](tokenStream, result, true);
-                        if (tryParseResult) {
-                            return [ this.name, result, [ 'EXPRESSION', i, expressionStrings[i] ] ];
-                        }
-                    }
-
-                    throw new Error(`No expressions parsed successfully for rule with multiple expressions: ${this.name}`);
-                }
-
-                tryFunc = (tokenStream) => {
-                    const token = tokenStream.currentToken();
-                    for (let i = 0; i < this.expressions.length; i++) {
-                        if (!expressionLookaheadSets[i].has(token.type))
-                            continue;
-
-                        const result = [];
-                        const tryParseResult = expressionTryParseFuncs[i](tokenStream, result);
-                        if (tryParseResult) {
-                            return [ this.name, result, [ 'EXPRESSION', i, expressionStrings[i] ] ];
-                        }
-                    }
-
-                    return null;
-                }
-                break;
+            return [ this.name, tryResult ];
         }
 
         parser.ruleFunctions[this.index] = func.bind(parser);
@@ -222,66 +171,32 @@ GrammarForge.Rule = class Rule {
     createBaseFunction = (exec) => {
         if (exec.ruleFunctions.length !== this.index)
             throw new Error(`exec.ruleFunctions length ${exec.ruleFunctions.length} does not match rule index ${this.index}`);
-
-        if (this.expressions.length === 0)
-            throw new Error(`Rule ${this.name} has no expressions`);
-
-        const ruleIndex = this.index;
-        const name = this.name;
-        const execFuncs = exec.execFunctions[ruleIndex];
-        const ruleString = this.toString();
-
-        if (exec.allCheckFunctions.length !== ruleIndex)
-            throw new Error(`exec.allCheckFunctions length ${exec.allCheckFunctions.length} does not match rule index ${ruleIndex}`);
-
-        exec.allCheckFunctions.push([]);
-        const checkFuncs = exec.allCheckFunctions[ruleIndex];
-
-        if (exec.allExpressionOptions.length !== ruleIndex)
-            throw new Error(`exec.allExpressionOptions length ${exec.allExpressionOptions.length} does not match rule index ${ruleIndex}`);
-
-        exec.allExpressionOptions.push([]);
-        const expressionOptions = exec.allExpressionOptions[ruleIndex];
-
-        const expressionStrings = [];
-        for (let i = 0; i < this.expressions.length; i++) {
-            const expression = this.expressions[i];
-            checkFuncs.push(expression.getCheckFunction(exec));
-            expressionOptions.push(expression.getBaseFunction(exec));
-            expressionStrings.push(expression.expressionString);
-        }
-
+        
         this.checkMakeDefaultExecFunctions(exec);
 
+        const name = this.name;
+        const execFuncs = exec.execFunctions[this.index];
+        //const ruleString = this.toString();//Only for troubleshooting with const t = ruleString; below
+
+        const expListBaseFunc = this.expList.getBaseFunction(exec);
+
         let func = (ast) => {
-            exec.check_length(ast, 3);
-            const [ type, expressionNode, expressionInfo ] = ast;
+            exec.check_length(ast, 2);
+            const [ type, expListNode ] = ast;
             if (type !== name)
                 throw new Error(`Expected ${name} node, found ${type}`);
 
-            const [expressionInfoType, index, expressionStr] = expressionInfo;
-            if (expressionInfoType !== 'EXPRESSION')
-                throw new Error(`Expected EXPRESSION node, found ${type}`);
+            if (expListNode.length === 0)
+                return GrammarForge.NORMAL_CONTROL;
+            
+            const result = expListBaseFunc(expListNode);
+            const ruleExpressionIndex = expListNode[2][1];//Get the expression index from the EXPRESSION node.  It is checked in ExpList.getBaseFunction().
 
-            if (expressionStr !== expressionStrings[index])
-                throw new Error(`Expression string mismatch for rule ${name} at index ${index}. Expected: ${expressionStrings[index]}, found: ${expressionStr}`);
-
-            const checkFunc = checkFuncs[index];
-            if (!checkFunc)
-                throw new Error(`No check function found for expression index ${index} in rule ${name}`);
-
-            const expressionOption = expressionOptions[index];
-            if (!expressionOption)
-                throw new Error(`No exec function found for expression index ${index} in rule ${name}`);
-
-            const execFunc = execFuncs[index];
+            const execFunc = execFuncs[ruleExpressionIndex];
             if (execFunc === undefined)
-                throw new Error(`No exec function found for expression index ${index} in rule ${name}.  If none is provided, it must be null.`);
+                throw new Error(`No exec function found for expression index ${ruleExpressionIndex} in rule ${name}.  If none is provided, it must be null.`);
 
-            const t = ruleString;
-
-            checkFunc(expressionNode);
-            const result = expressionOption(expressionNode);
+            //const t = ruleString;//Only for troubleshooting with const ruleString = this.toString(); above
 
             if (execFunc !== null) {
                 return execFunc(result);
@@ -298,11 +213,11 @@ GrammarForge.Rule = class Rule {
         if (this.tryMakeDefaultExecFunctionFromRuleTag(exec) === true)
             return;
 
-        for (let i = 0; i < this.expressions.length; i++) {
+        for (let i = 0; i < this.expList.expressions.length; i++) {
             this.tryMakeDefaultExecFunctionFromTag(exec, i);
         }
 
-        for (let i = 0; i < this.expressions.length; i++) {
+        for (let i = 0; i < this.expList.expressions.length; i++) {
             this.tryMakeDefaultExpExecFunc(exec, i);
         }
     }
@@ -312,34 +227,40 @@ GrammarForge.Rule = class Rule {
         if (tag === null)
             return false;
 
-        if (this.expressions.length !== 1)
-            return false;
+        for (let i = 0; i < this.expList.expressions.length; i++) {
+            const expression = this.expList.expressions[i];
+            let func = null;
+            switch (tag) {
+                case 'block': {
+                        const [ stmtListIndex ] = this.getNonTerminalIndices(exec, expression, ['sl'], tag);
 
-        const expression = this.expressions[0];
-        let func = null;
-        switch (tag) {
-            case 'block': {
-                    const [ stmtListIndex ] = this.getNonTerminalIndices(exec, expression, ['sl'], tag);
+                        const defaultFunc = exec.defaultExecFunctions.get("block");
+                        func = (arr) => defaultFunc(arr[stmtListIndex]);
+                    }
 
-                    const defaultFunc = exec.defaultExecFunctions.get("block");
-                    func = (arr) => defaultFunc(arr[stmtListIndex]);
-                }
+                    break;
+            }
 
-                break;
+            if (func !== null) {
+                exec.execFunctions[this.index][i] = func;
+                continue;
+            }
+
+            if (i == 0) {
+                return false;
+            }
+            else {
+                throw new Error(`Rule tagged as ${tag} has multiple expressions.  Succeeded creating a default exec function using the rule tag for the first expression, but failed on expression ${i}.  Rule: ${this.name}`);
+            }
         }
 
-        if (func !== null) {
-            exec.execFunctions[this.index][0] = func;
-            return true;
-        }
-
-        return false;
+        return true;
     }
 
     tryMakeDefaultExecFunctionFromTag = (exec, expressionIndex) => {
         const ruleIndex = this.index;
 
-        const expression = this.expressions[expressionIndex];
+        const expression = this.expList.expressions[expressionIndex];
         const tag = expression.tag;
         if (tag === null)
             return;
@@ -356,6 +277,13 @@ GrammarForge.Rule = class Rule {
                     
                     const defaultFunc = exec.defaultExecFunctions.get("while");
                     func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex]);
+                }
+                break;
+            case 'foreach' : {
+                    const [ varIndex, expIndex, stmtIndex ] = this.getNonTerminalIndices(exec, expression, ['var', 'exp', 'stmt'], tag);
+                    
+                    const defaultFunc = exec.defaultExecFunctions.get("foreach");
+                    func = (arr) => defaultFunc(arr[varIndex], arr[expIndex], arr[stmtIndex]);
                 }
                 break;
             case 'assign': {
@@ -440,10 +368,13 @@ GrammarForge.Rule = class Rule {
                         if (e.message.startsWith("Unknown non-terminal")) {
                             const [ optionalIndex ] = this.getNonTerminalIndices(exec, expression, ['optional'], tag);
                             const optional = expression.words[optionalIndex];
-                            if (!(optional instanceof GrammarForge.Par) || optional.parType !== 'QUESTION')
+                            if (!(optional instanceof GrammarForge.QWord) || optional.oType !== 'QUESTION')
                                 throw e;
 
-                            const parExpression = optional.expression;
+                            if (!(optional.word instanceof GrammarForge.Par))
+                                throw e;
+
+                            const parExpression = optional.word.expList.expressions[0];
                             if (parExpression.words.length !== 1)
                                 throw e;
 
@@ -529,15 +460,23 @@ GrammarForge.Rule = class Rule {
                             throw new Error(`Found a ${tag} tag, expected Term: ${word.string}`);
                         }
                         
-                        if (word instanceof GrammarForge.Par) {
-                            if (word.parType === 'QUESTION') {
-                                //Look for stmt inside the par
-                                const parNonTerminals = word.expression.getNonTerminals();
-                                if (parNonTerminals.length !== 1)
-                                    throw new Error(`Found a ${tag} tag on expression: ${expression.expressionString}, but the optional else stmt must contain exactly 1 non-terminal: stmt. Found ${parNonTerminals.length}`);
+                        if (word instanceof GrammarForge.QWord) {
+                            if (word.oType === 'QUESTION') {
+                                if (!(word.word instanceof GrammarForge.Par))
+                                    throw new Error(`Found a ${tag} tag on expression: ${expression.expressionString}, but the optional else stmt must be a Par.`);
 
-                                const elseNonTerminalIndex = parNonTerminals[0];
-                                const elseWord = word.expression.words[elseNonTerminalIndex];
+                                //Look for stmt inside the par
+                                const nonTerminals = word.word.expList.tryGetNonTerminals();
+                                if (nonTerminals === null || nonTerminals.length !== 1)
+                                    throw new Error(`Found a ${tag} tag on expression: ${expression.expressionString}, but the optional else stmt must contain exactly 1 non-terminal: stmt. Found ${nonTerminals?.length ?? 'null'}`);
+
+                                const parExpression = word.word.expList.expressions[0];
+                                const nonTermIndexes = parExpression.getNonTerminals();
+                                if (nonTermIndexes.length !== 1)
+                                    throw new Error(`Found a ${tag} tag on expression: ${expression.expressionString}, but the optional else stmt must contain exactly 1 non-terminal: stmt. Found ${nonTermIndexes.length}`);
+
+                                const elseNonTerminalIndex = nonTermIndexes[0];
+                                const elseWord = parExpression.words[elseNonTerminalIndex];
                                 this.validateWord(elseWord, tag);
                                 if (elseWord.value !== stmtRule.name)
                                     throw new Error(`Found a ${tag} tag on expression: ${expression.expressionString}, but the optional else stmt must be of type ${stmtRule.name}. Found ${elseWord.string}`);
@@ -566,18 +505,22 @@ GrammarForge.Rule = class Rule {
                     }
                     else {
                         if (elseParIndex === -1) {
-                            func = (arr) => defaultFunc(arr[expIndex], arr[ifBodyIndex], arr[elseBodyIndex]);
+                            func = (arr) => {
+                                return defaultFunc(arr[expIndex], arr[ifBodyIndex], arr[elseBodyIndex]);
+                            }
                         }
                         else {
                             const getElseBody = (arr) => {
-                                const parArr = arr[elseBodyIndex]();
-                                if (parArr.length === 0)
+                                const parArr = arr[elseBodyIndex];
+                                if (parArr === null)
                                     return null;
 
                                 return parArr[elseParIndex];
                             }
 
-                            func = (arr) => defaultFunc(arr[expIndex], arr[ifBodyIndex], getElseBody(arr));
+                            func = (arr) => {
+                                return defaultFunc(arr[expIndex], arr[ifBodyIndex], getElseBody(arr));
+                            }
                         }
                     }
                 }
@@ -631,7 +574,7 @@ GrammarForge.Rule = class Rule {
                 const index = nonTerminals[j];
                 const word = expression.words[index];
                 if (rule.name === 'optional') {
-                    if (word instanceof GrammarForge.Par) {
+                    if (word instanceof GrammarForge.QWord) {
                         if (indices[i] !== -1)
                             throw new Error(`Duplicate optional non-terminal: ${expression.expressionString}`);
 
@@ -676,7 +619,7 @@ GrammarForge.Rule = class Rule {
         if (this.isExpRule !== true)
             return;
 
-        const expression = this.expressions[expressionIndex];
+        const expression = this.expList.expressions[expressionIndex];
         if (expression.tag !== null)
             return;
 
@@ -720,14 +663,19 @@ GrammarForge.Rule = class Rule {
                 // exp_n : exp_{n+1} (op_n exp_{n+1})*
                 // exp_n : exp_{n+1} (op_n exp_{n+1})+ | exp_{n+1}
                 // exp_n : exp_{n+1} (op_n exp_n)?
-                if (!(secondWord instanceof GrammarForge.Par)) {
+                if (!(secondWord instanceof GrammarForge.QWord)) {
+                    if (!hasExecFunc)
+                        console.warn(`Found an rule that is a child of your 'exp' rule, but its second word is not a QWord.  It also does not have a provided execution function.  Skipping default exp exec function generation for this expression:\n${this.toString()}\nexpression: ${expression.expressionString}`);
+                }
+
+                if (!(secondWord.word instanceof GrammarForge.Par)) {
                     if (!hasExecFunc)
                         console.warn(`Found an rule that is a child of your 'exp' rule, but its second word is not a Par.  It also does not have a provided execution function.  Skipping default exp exec function generation for this expression:\n${this.toString()}\nexpression: ${expression.expressionString}`);
 
                     return;
                 }
                 
-                const parExpression = secondWord.expression;
+                const parExpression = secondWord.word.expList.expressions[0];
                 if (parExpression.words.length !== 2) {
                     if (!hasExecFunc)
                         console.warn(`Found an rule that is a child of your 'exp' rule, but its second word Par does not have exactly 2 words.  It also does not have a provided execution function.  Skipping default exp exec function generation for this expression:\n${this.toString()}\nexpression: ${expression.expressionString}`);
@@ -751,7 +699,7 @@ GrammarForge.Rule = class Rule {
                     return;
                 }
 
-                const questionPar = secondWord.parType === 'QUESTION';
+                const questionPar = secondWord.oType === 'QUESTION';
                 if (questionPar) {
                     // exp_n : exp_{n+1} (op_n exp_n)?
                     if (parSecondWord.value !== this.name) {
@@ -809,23 +757,22 @@ GrammarForge.Rule = class Rule {
 
                     if (questionPar) {
                         func = (arr) => {
-                            const [ exp_n_1, optional ] = arr;
+                            const [ exp_n_1, optionalParArr ] = arr;
                             const left = exp_n_1();
-                            const optionalArr = optional();
-                            if (optionalArr.length === 0)
+                            if (optionalParArr === null)
                                 return left;
 
-                            const [ op_n, exp_n ] = optionalArr;
+                            const [ op_n, exp_n ] = optionalParArr;
+
                             const right = exp_n();
                             return baseFunc(left, right);
                         }
                     }
                     else {
                         func = (arr) => {
-                            const [ exp_n_1, optional ] = arr;
+                            const [ exp_n_1, optionalArr ] = arr;
                             let result = exp_n_1();
-                            const optionalArr = optional();
-                            if (optionalArr.length === 0)
+                            if (optionalArr === null)
                                 return result;
 
                             for (const [ op_n, exp_n ] of optionalArr) {
@@ -840,10 +787,9 @@ GrammarForge.Rule = class Rule {
                 else {
                     if (questionPar) {
                         func = (arr) => {
-                            const [ exp_n_1, optional ] = arr;
+                            const [ exp_n_1, optionalArr ] = arr;
                             const left = exp_n_1();
-                            const optionalArr = optional();
-                            if (optionalArr.length === 0)
+                            if (optionalArr === null)
                                 return left;
 
                             const [ op_n, exp_n ] = optionalArr;
@@ -858,10 +804,9 @@ GrammarForge.Rule = class Rule {
                     }
                     else {
                         func = (arr) => {
-                            const [ exp_n_1, optional ] = arr;
+                            const [ exp_n_1, optionalArr ] = arr;
                             let result = exp_n_1();
-                            const optionalArr = optional();
-                            if (optionalArr.length === 0)
+                            if (optionalArr === null)
                                 return result;
 
                             for (const [ op_n, exp_n ] of optionalArr) {
@@ -1071,8 +1016,8 @@ GrammarForge.Rule = class Rule {
         if (rule.isExpRule !== true)
             throw new Error(`Rule is not an exp rule: ${rule.name}`);
 
-        if (rule.expressions.length === 1) {
-            const expression = rule.expressions[0];
+        if (rule.expList.expressions.length === 1) {
+            const expression = rule.expList.expressions[0];
             if (expression.words.length !== 1)
                 return false;
 
@@ -1093,7 +1038,7 @@ GrammarForge.Rule = class Rule {
         }
         else {
             //If multiple expressions, they must all be 1 word with an operator tag.
-            for (const expression of rule.expressions) {
+            for (const expression of rule.expList.expressions) {
                 if (expression.words.length !== 1)
                     return false;
 
@@ -1134,7 +1079,7 @@ GrammarForge.Rule = class Rule {
             if (!rule)
                 throw new Error(`No rule found with name: ${word.value}`);
 
-            for (const expression of rule.expressions) {
+            for (const expression of rule.expList.expressions) {
                 if (expression.words.length !== 1) {
                     throw new Error(`Op rule expressions must have exactly 1 word.  Found expression: ${expression.expressionString} in rule: ${rule.name}`);
                 }
@@ -1163,7 +1108,7 @@ GrammarForge.Rule = class Rule {
                     if (!innerRule)
                         throw new Error(`No rule found with name: ${firstWord.value}`);
 
-                    for (const innerExpression of innerRule.expressions) {
+                    for (const innerExpression of innerRule.expList.expressions) {
                         if (innerExpression.words.length !== 1) {
                             throw new Error(`Op rule expressions must have exactly 1 word.  Found expression: ${innerExpression.expressionString} in rule: ${innerRule.name}`);
                         }
@@ -1185,14 +1130,11 @@ GrammarForge.Rule = class Rule {
     }
 
     getChildren = (parser, childrenIndexSet) => {
-        for (let i = 0; i < this.expressions.length; i++) {
-            const expr = this.expressions[i];
-            expr.getChildren(parser, childrenIndexSet);
-        }
+        this.expList.getChildren(parser, childrenIndexSet);
     }
 
     toString() {
-        return `${this.name} ::= ${this.expressions.map(expr => expr.toString()).join(" | ")}`;
+        return `${this.name} ::= ${this.expList.toString()}`;
     }
 }
 

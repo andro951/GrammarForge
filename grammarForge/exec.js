@@ -7,19 +7,17 @@
             this.getRule = this.parser.getRule;
             this.ruleTagLookup = this.parser.ruleTagLookup;
             this.metaExpressionLookup = this.parser.metaExpressionLookup;
+            this.rootRuleIndex = 0;
             this.setup(functions);
         }
 
         setup = (functions) => {
             this.execFunctions = [];
             for (let i = 0; i < this.parser.rules.length; i++) {
-                this.execFunctions.push(Array(this.parser.rules[i].expressions.length).fill(null));
+                this.execFunctions.push(Array(this.parser.rules[i].expList.expressions.length).fill(null));
             }
 
             this.ruleFunctions = [];
-
-            this.allCheckFunctions = [];
-            this.allExpressionOptions = [];
             
             this.ruleIndexLookup = this.parser.ruleIndexLookup;
             this.expressionIndexLookup = this.parser.expressionIndexLookup;
@@ -55,24 +53,41 @@
             //Simple default functions like sl (statement list) are generated here because it doesn't require an expression tag.  
             //  Others are created by the rule objects.
 
+            const tryGetInnerWord = (word) => {
+                if (word instanceof GrammarForge.Term)
+                    return word;
+
+                if (word instanceof GrammarForge.Par) {
+                    const expList = word.expList;
+                    if (expList.expressions.length === 1) {
+                        const expr = expList.expressions[0];
+                        if (expr.words.length === 1)
+                            return tryGetInnerWord(expr.words[0]);
+                    }
+                    else {
+                        return null;
+                    }
+                }
+            }
+
             //sl (statement list)
             const stmt_rule = this.ruleTagLookup.get("stmt");
             if (stmt_rule !== undefined) {
                 let found = false;
                 for (let i = 0; i < this.parser.rules.length; i++) {
                     const rule = this.parser.rules[i];
-                    for (let j = 0; j < rule.expressions.length; j++) {
-                        const expr = rule.expressions[j];
+                    for (let j = 0; j < rule.expList.expressions.length; j++) {
+                        const expr = rule.expList.expressions[j];
                         const nonTerminals = expr.getNonTerminals();
                         if (nonTerminals.length === 1) {
                             const nonTerminalIndex = nonTerminals[0];
-                            const word = expr.words[nonTerminalIndex];
-                            if (word instanceof GrammarForge.Par && (word.parType === "PLUS" || word.parType === "STAR")) {
-                                const parNonTerminals = word.expression.getNonTerminals();
-                                if (parNonTerminals.length !== 1)
+                            const word = expr.words[nonTerminalIndex];//Allowed to have terminals at the top level only like START stmt* END, but not inside the QWord like (stmt SEMI)*
+                            if (word instanceof GrammarForge.QWord && (word.oType === "PLUS" || word.oType === "STAR")) {
+                                const qWordNonTerminals = word.tryGetNonTerminals();
+                                if (qWordNonTerminals.length !== 1)
                                     continue;
 
-                                const parWord = word.expression.words[parNonTerminals[0]];
+                                const parWord = qWordNonTerminals[0];
                                 if (!(parWord instanceof GrammarForge.Term))
                                     continue;
 
@@ -81,12 +96,12 @@
 
                                 found = true;
                                 if (this.execFunctions[i][j] !== null) {
-                                    console.warn(`A rule was tagged as stmt:\n${stmt_rule.toString()}\nbut the expression that looks like a statement list already has a user-defined exec function.  Skipping default statement list function generation for this expression:\n${expr.toString()}`);
+                                    console.warn(`A rule was tagged as stmt:\n${stmt_rule.toString()}\nbut the expression that looks like a statement list already has a user-defined exec function.  Skipping default statement list function generation for this expression:\n${expr.expressionString}`);
                                     continue;
                                 }
 
-                                if (rule.expressions.length !== 1) {
-                                    console.warn(`A rule was tagged as stmt:\n${stmt_rule.toString()}\nbut the expression that looks like a statement list is in a rule with multiple expressions.  Skipping default statement list function generation for this expression:\n${expr.toString()}`);
+                                if (rule.expList.expressions.length !== 1) {
+                                    console.warn(`A rule was tagged as stmt:\n${stmt_rule.toString()}\nbut the expression that looks like a statement list is in a rule with multiple expressions.  Skipping default statement list function generation for this expression:\n${expr.expressionString}`);
                                     break;
                                 }
 
@@ -109,8 +124,8 @@
             //func_call only in a stmt
             if (stmt_rule !== undefined && this.metaExpressionLookup.has("func_call")) {
                 let found = false;
-                for (let j = 0; j < stmt_rule.expressions.length; j++) {
-                    const expr = stmt_rule.expressions[j];
+                for (let j = 0; j < stmt_rule.expList.expressions.length; j++) {
+                    const expr = stmt_rule.expList.expressions[j];
                     const nonTerminals = expr.getNonTerminals();
                     if (nonTerminals.length === 1) {
                         const nonTerminalIndex = nonTerminals[0];
@@ -120,19 +135,19 @@
                             if (!rule)
                                 throw new Error(`No rule found for non-terminal: ${word.value}`);
 
-                            if (rule.expressions.length !== 1)
+                            if (rule.expList.expressions.length !== 1)
                                 continue;
 
-                            const ruleExpr = rule.expressions[0];
+                            const ruleExpr = rule.expList.expressions[0];
                             if (ruleExpr.tag !== "func_call")
                                 continue;
 
                             if (found)
-                                console.warn(`Multiple expressions found in stmt rule that look like an exp only statement.  Only one is expected.  Expression:\n${expr.toString()}`);
+                                console.warn(`Multiple expressions found in stmt rule that look like an exp only statement.  Only one is expected.  Expression:\n${expr.expressionString}`);
 
                             found = true;
                             if (this.execFunctions[stmt_rule.index][j] !== null) {
-                                console.warn(`A rule was tagged as stmt:\n${stmt_rule.toString()}\nbut the expression that looks like an exp only statement already has a user-defined exec function.  Skipping default exp only statement function generation for this expression:\n${expr.toString()}`);
+                                console.warn(`A rule was tagged as stmt:\n${stmt_rule.toString()}\nbut the expression that looks like an exp only statement already has a user-defined exec function.  Skipping default exp only statement function generation for this expression:\n${expr.expressionString}`);
                                 continue;
                             }
 
@@ -149,7 +164,7 @@
             Object.freeze(this.ruleTagLookup);
         }
 
-        exec = (ast, variables = null) => {
+        exec = (ast, variables = null, variableGetters = null) => {
             if (variables === null) {
                 variables = new Map();
             }
@@ -157,9 +172,21 @@
                 throw new Error("Variables parameter must be a Map or null.");
             }
 
+            if (variableGetters !== null) {
+                if (!(variableGetters instanceof Map))
+                    throw new Error("Variable getters parameter must be a Map or null.");
+
+                // for (const [ name, func ] of variableGetters) {
+                //     if (typeof func !== 'function')
+                //         throw new Error(`Variable getter for ${name} is not a function.`);
+                // }
+            }
+
             this.variables = [ variables ];
+            this.variableGetters = variableGetters;
             const result = this.execute(ast);
             this.variables = null;
+            this.variableGetters = null;
             return result;
         }
 
@@ -170,11 +197,22 @@
             if (!this.variables)
                 throw new Error("No variables context available for execution.  Call exec() to execute AST.");
 
-            const func = this.ruleFunctions[0];
+            const func = this.ruleFunctions[this.rootRuleIndex];
             if (!func)
                 throw new Error(`No exec function found for AST node type: ${first}`);
 
             return func(ast);
+        }
+
+        swapRootRule = (ruleName) => {
+            const ruleIndex = this.ruleIndexLookup.get(ruleName);
+            if (ruleIndex === undefined)
+                throw new Error(`No rule found with name: ${ruleName}`);
+
+            if (this.rootRuleIndex === ruleIndex)
+                throw new Error(`Rule ${ruleName} is already the root rule.`);
+
+            this.rootRuleIndex = ruleIndex;
         }
 
         token = (ast, requiredTokenType) => {
@@ -257,6 +295,10 @@
         }
 
         declare_variable = (name, val) => {
+            if (this.variableGetters && this.variableGetters.has(name)) {
+                throw new Error(`${name} is already used.  It cannot be used as a variable name.`);
+            }
+
             const variables = this.variables;
 
             for (let i = variables.length - 1; i >= 0; i--) {
@@ -266,12 +308,16 @@
             }
 
             variables[variables.length - 1].set(name, val);
-            if (ZonGrammar.debuggingFunctions) {
+            if (GrammarForge.debuggingFunctions) {
                 console.log(`let ${name} = ${val}`);
             }
         }
 
         declare_variable_func = (name, func) => {
+            if (this.variableGetters && this.variableGetters.has(name)) {
+                throw new Error(`${name} is already used.  It cannot be used as a variable name.`);
+            }
+
             const variables = this.variables;
 
             for (let i = variables.length - 1; i >= 0; i--) {
@@ -282,7 +328,7 @@
 
             const val = func();
             variables[variables.length - 1].set(name, val);
-            if (ZonGrammar.debuggingFunctions) {
+            if (GrammarForge.debuggingFunctions) {
                 console.log(`let ${name} = ${val}`);
             }
         }
@@ -294,7 +340,7 @@
                 const scope = variables[i];
                 if (scope.has(name)) {
                     scope.set(name, val);
-                    if (ZonGrammar.debuggingFunctions) {
+                    if (GrammarForge.debuggingFunctions) {
                         console.log(`${name} = ${val}`);
                     }
 
@@ -313,7 +359,7 @@
                 if (scope.has(name)) {
                     const val = func();
                     scope.set(name, val);
-                    if (ZonGrammar.debuggingFunctions) {
+                    if (GrammarForge.debuggingFunctions) {
                         console.log(`${name} = ${val}`);
                     }
 
@@ -325,6 +371,10 @@
         }
 
         get_variable = (name) => {
+            if (this.variableGetters && this.variableGetters.has(name)) {
+                return this.variableGetters.get(name)();
+            }
+
             const variables = this.variables;
             for (let i = variables.length - 1; i >= 0; i--) {
                 const scope = variables[i];
@@ -360,12 +410,12 @@
             const execution = this;
             const declare_variable_func = execution.declare_variable_func;
             const declare_variable_default_value = execution.declare_variable_default_value;
+            const set_variable = execution.set_variable;
             const get_variable = execution.get_variable;
             const set_variable_func = execution.set_variable_func;
             this.defaultExecFunctions = new Map([
                 ['sl', (stmt_list) => {
-                    const stmtsArr = stmt_list();
-                    for (const stmt of stmtsArr) {
+                    for (const stmt of stmt_list) {
                         const result = execution.ev(stmt);//Check if works as just const result = stmt();
                         if (result.type !== GrammarForge.FlowControlID.NORMAL)
                             return result;
@@ -379,35 +429,76 @@
                     return GrammarForge.NORMAL_CONTROL;
                 }],
                 ['while', (exp, stmt) => {
-                        if (ZonGrammar.debuggingFunctions) {
-                            console.log(`while start`);
-                        }
-                        
-                        while (exp()) {
-                            const result = execution.ev(stmt);
-                            let breakWhile = false;
-                            switch (result.type) {
-                                case GrammarForge.FlowControlID.BREAK:
-                                    breakWhile = true;
-                                    break;
-                                case GrammarForge.FlowControlID.CONTINUE:
-                                    continue;
-                                case GrammarForge.FlowControlID.NORMAL:
-                                    break;
-                                default:
-                                    return result;
-                            }
-
-                            if (breakWhile)
+                    if (GrammarForge.debuggingFunctions) {
+                        console.log(`while start`);
+                    }
+                    
+                    while (exp()) {
+                        const result = execution.ev(stmt);
+                        let breakWhile = false;
+                        switch (result.type) {
+                            case GrammarForge.FlowControlID.BREAK:
+                                breakWhile = true;
                                 break;
+                            case GrammarForge.FlowControlID.CONTINUE:
+                                continue;
+                            case GrammarForge.FlowControlID.NORMAL:
+                                break;
+                            default:
+                                return result;
                         }
 
-                        
-                        if (ZonGrammar.debuggingFunctions) {
-                            console.log(`while end`);
+                        if (breakWhile)
+                            break;
+                    }
+
+                    
+                    if (GrammarForge.debuggingFunctions) {
+                        console.log(`while end`);
+                    }
+
+                    return GrammarForge.NORMAL_CONTROL;
+                }],
+                ['foreach', (var_, exp, stmt) => {
+                    if (GrammarForge.debuggingFunctions) {
+                        console.log(`foreach start`);
+                    }
+
+                    const iterable = exp();
+                    if (!iterable || typeof iterable[Symbol.iterator] !== 'function') {
+                        throw new Error(`Foreach expression did not return an iterable.`);
+                    }
+
+                    execution.push_block_scope();
+                    const variableName = var_();
+                    declare_variable_default_value(variableName);
+                    for (const item of iterable) {
+                        set_variable(variableName, item);
+                        const result = execution.ev(stmt);
+                        let breakForeach = false;
+                        switch (result.type) {
+                            case GrammarForge.FlowControlID.BREAK:
+                                breakForeach = true;
+                                break;
+                            case GrammarForge.FlowControlID.CONTINUE:
+                                continue;
+                            case GrammarForge.FlowControlID.NORMAL:
+                                break;
+                            default:
+                                return result;
                         }
 
-                        return GrammarForge.NORMAL_CONTROL;
+                        if (breakForeach)
+                            break;
+                    }
+
+                    execution.pop_block_scope();
+                    
+                    if (GrammarForge.debuggingFunctions) {
+                        console.log(`foreach end`);
+                    }
+
+                    return GrammarForge.NORMAL_CONTROL;
                 }],
                 ['declare', (var_, exp) => {
                     const v = var_();
@@ -436,7 +527,7 @@
                         const scope = variables[i];
                         if (scope.has(v)) {
                             scope.set(v, val);
-                            if (ZonGrammar.debuggingFunctions) {
+                            if (GrammarForge.debuggingFunctions) {
                                 console.log(`${v} = ${val}`);
                             }
 
@@ -446,7 +537,7 @@
 
                     const currentScope = variables[variables.length - 1];
                     currentScope.set(v, val);
-                    if (ZonGrammar.debuggingFunctions) {
+                    if (GrammarForge.debuggingFunctions) {
                         console.log(`${v} = ${val}`);
                     }
 
@@ -454,7 +545,7 @@
                 }],
                 ['get', (var_) => get_variable(var_())],
                 ['block', (stmt_list) => {
-                    if (ZonGrammar.debuggingFunctions) {
+                    if (GrammarForge.debuggingFunctions) {
                         console.log(`block start`);
                     }
 
@@ -462,7 +553,7 @@
                     const result = execution.ev(stmt_list);
                     execution.pop_block_scope();
 
-                    if (ZonGrammar.debuggingFunctions) {
+                    if (GrammarForge.debuggingFunctions) {
                         console.log(`block end`);
                     }
                     
@@ -472,14 +563,14 @@
                     return exp();
                 }],
                 ['break', () => {
-                    if (ZonGrammar.debuggingFunctions) {
+                    if (GrammarForge.debuggingFunctions) {
                         console.log(`BREAK`);
                     }
 
                     return GrammarForge.BREAK_CONTROL;
                 }],
                 ['continue', () => {
-                    if (ZonGrammar.debuggingFunctions) {
+                    if (GrammarForge.debuggingFunctions) {
                         console.log(`CONTINUE`);
                     }
 
@@ -506,14 +597,13 @@
                     return new GrammarForge.ReturnControl(value);
                 }],
                 ['return optional', (exp) => {
-                    const arr = exp();
-                    if (arr.length === 0)
+                    if (exp === null)
                         return GrammarForge.RETURN_NO_VALUE_CONTROL;
 
-                    if (arr.length > 1)
+                    if (exp.length > 1)
                         throw new Error(`Return optional node must have at most one child.`);
 
-                    const value = arr[0]();
+                    const value = exp[0]();
                     return new GrammarForge.ReturnControl(value);
                 }],
                 ['func_declare', (var_, optional, block) => {
@@ -527,16 +617,14 @@
                     }
 
                     const parameters = [];
-                    const opt = optional();
-                    if (opt.length > 0) {
+                    if (optional !== null) {
                         //TODO: This assumes a structure of (first, (COMMA, exp)*)
                         //Should make it more generic.  Probably generating a collecting function 
                         // and passing it as an arguemnt to this function.
-                        const [first, rest] = opt;
+                        const [first, rest] = optional;
                         const firstParam = first();
                         parameters.push(firstParam);
-                        const restParams = rest();
-                        parameters.push(...restParams.map(([_, exp]) => exp()));
+                        parameters.push(...rest.map(([_, exp]) => exp()));
                     }
 
                     const val = new GrammarForge.FunctionDeclaration(
@@ -547,7 +635,7 @@
                     );
 
                     variables[variables.length - 1].set(v, val);
-                    if (ZonGrammar.debuggingFunctions) {
+                    if (GrammarForge.debuggingFunctions) {
                         console.log(`let ${v} = ${val}`);
                     }
 
@@ -559,19 +647,17 @@
                     if (!(func instanceof GrammarForge.FunctionDeclaration))
                         throw new Error(`Tried to call vairable as a function, but it is not a function: ${v}, type: ${type}, value: ${func}`);
 
-                    const opt = optional();
                     let result;
-                    if (opt.length === 0) {
+                    if (optional === null) {
                         result = func.call([]);//no arguments
                     }
                     else {
                         //TODO: This assumes a structure of (first, (COMMA, exp)*)
                         //Should make it more generic.  Probably generating a collecting function 
                         // and passing it as an arguemnt to this function.
-                        const [first, rest] = opt;
+                        const [first, rest] = optional;
                         const firstArg = first();
-                        const restArgs = rest();
-                        const args = [firstArg, ...restArgs.map(([_, exp]) => exp())];
+                        const args = [firstArg, ...rest.map(([_, exp]) => exp())];
                         result = func.call(args);
                     }
 

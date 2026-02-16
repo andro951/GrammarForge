@@ -116,7 +116,9 @@ const GrammarForge = class GrammarForge {
         return this.parser.parse(str);
     }
 
-    exec = (ast) => {
-        return this.execution.exec(ast);
+    exec = (ast, variables = null, variableGetters = null) => {
+        return this.execution.exec(ast, variables, variableGetters);
     }
 };
+
+GrammarForge.debuggingFunctions = false;

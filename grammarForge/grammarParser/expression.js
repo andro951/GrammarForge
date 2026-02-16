@@ -16,6 +16,7 @@ GrammarForge.Expression = class Expression {
         this.metadata = metadata;
         this.tag = this.metadata.length > 0 ? this.metadata[0] : null;
         this.expressionString = this.toString();
+        this.subFuncString = this.expressionString + `$E`;
         Object.freeze(this.words);
     }
 
@@ -95,100 +96,128 @@ GrammarForge.Expression = class Expression {
         return this.lookaheadSet;
     }
 
-    getLookaheadSet() {
-        return this.lookaheadSet;
-    }
-
     getParseFunc = (parser) => {
-        let funcIndex = parser.ruleSubFunctionLookup.get(this.expressionString);
+        let funcIndex = parser.ruleSubFunctionLookup.get(this.subFuncString);
         if (funcIndex === undefined) {
             if (this.words.length === 0)
                 throw new Error("Cannot create parse function for empty expression");
 
-            if (this.words.length === 1)
-                return this.words[0].getParseFunc(parser);//This should be ok to keep.
-
+            let func;
+            const length = this.words.length;
             const wordFunctions = [];
             for (let i = 0; i < this.words.length; i++) {
                 wordFunctions.push(this.words[i].getParseFunc(parser));
             }
 
-            const func = (tokenStream, result) => {
+            func = (tokenStream) => {
+                const result = [];
                 for (let i = 0; i < wordFunctions.length; i++) {
-                    wordFunctions[i](tokenStream, result);
+                    const wordResult = wordFunctions[i](tokenStream);
+                    if (!wordResult)
+                        throw new Error("Parse function for expression failed unexpectedly.");
+
+                    result.push(wordResult);
                 }
+
+                return [ 'EXP', result, ['LENGTH', length] ];
             }
 
-            funcIndex = parser.addSubFunction(this.expressionString, func);
+            funcIndex = parser.addSubFunction(this.subFuncString, func);
         }
 
         return parser.ruleSubFunctions[funcIndex];
     }
 
     getTryParseFunc = (parser) => {
-        let funcIndex = parser.ruleTrySubFunctionLookup.get(this.expressionString);
+        let funcIndex = parser.ruleTrySubFunctionLookup.get(this.subFuncString);
         if (funcIndex === undefined) {
             if (this.words.length === 0)
                 throw new Error("Cannot create parse function for empty expression");
 
-            if (this.words.length === 1)
-                return this.words[0].getTryParseFunc(parser);//This should be ok to keep.
-            
+            let tryFunc;
+            const length = this.words.length;
             const wordTryFunctions = [];
             for (let i = 0; i < this.words.length; i++) {
                 wordTryFunctions.push(this.words[i].getTryParseFunc(parser));
             }
 
-            const tryFunc = (tokenStream, result) => {
+            tryFunc = (tokenStream) => {
                 const clonedStream = tokenStream.clone();
+                const result = [];
                 for (let i = 0; i < wordTryFunctions.length; i++) {
-                    const wordResult = wordTryFunctions[i](clonedStream, result);
+                    const wordResult = wordTryFunctions[i](clonedStream);
                     if (!wordResult)
-                        return false;
+                        return null;
+
+                    result.push(wordResult);
                 }
 
                 tokenStream.index = clonedStream.index;
-                return true;
+                return [ 'EXP', result, ['LENGTH', length] ];
             }
 
-            funcIndex = parser.addTrySubFunction(this.expressionString, tryFunc);
+            funcIndex = parser.addTrySubFunction(this.subFuncString, tryFunc);
         }
 
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
     getCheckFunction = (exec) => {
-        const checkFunctions = [];
-        for (let i = 0; i < this.words.length; i++) {
-            checkFunctions.push(this.words[i].getCheckFunction(exec));
-        }
-
+        const length = this.words.length;
         return (ast) => {
-            exec.check_length(ast, checkFunctions.length);
-            for (let i = 0; i < checkFunctions.length; i++) {
-                checkFunctions[i](ast[i]);
-            }
+            exec.check_length(ast, length);
         }
     }
 
     getBaseFunction = (exec) => {
-        const exprString = this.expressionString;
+        //const exprString = this.expressionString;
         const baseFunctions = [];
         for (let i = 0; i < this.words.length; i++) {
             baseFunctions.push(this.words[i].getBaseFunction(exec));
-
         }
 
+        const len = this.words.length;
+        const checkFunc = this.getCheckFunction(exec);
         return (ast) => {
+            const [ expType, innerAST, lengthInfo ] = ast;
+            if (expType !== 'EXP')
+                throw new Error(`Expected EXP AST node, got ${expType}`);
+
+            const [ lengthTag, length ] = lengthInfo;
+            if (lengthTag !== 'LENGTH')
+                throw new Error(`Expected LENGTH info in EXP AST node, got ${lengthTag}`);
+
+            if (length !== len)
+                throw new Error(`Expected EXP AST node length ${len}, got ${length}`);
+
+            checkFunc(innerAST);
+
             const results = [];
             for (let i = 0; i < baseFunctions.length; i++) {
-                results.push(baseFunctions[i](ast[i]));
+                results.push(baseFunctions[i](innerAST[i]));
             }
 
-            const t = exprString;
+            //const t = exprString;
             
             return results;
         }
+    }
+
+    tryGetNonTerminals = () => {
+        const nonTerminals = [];
+        for (let i = 0; i < this.words.length; i++) {
+            const word = this.words[i];
+            const wordNonTerminals = word.tryGetNonTerminals();
+            if (!wordNonTerminals)
+                return null;
+
+            if (wordNonTerminals.length === 0)
+                continue;
+
+            nonTerminals.push(...wordNonTerminals);
+        }
+
+        return nonTerminals;
     }
 
     getNonTerminals = () => {
@@ -209,20 +238,7 @@ GrammarForge.Expression = class Expression {
     getChildren = (parser, childrenIndexSet) => {
         for (let j = 0; j < this.words.length; j++) {
             const word = this.words[j];
-            if (word instanceof GrammarForge.Term && word.type === "IDENTIFIER") {
-                const rule = parser.getRule(word.value);
-                if (!rule)
-                    throw new Error(`No rule found for non-terminal: ${word.value}`);
-
-                if (childrenIndexSet.has(rule.index))
-                    continue;
-                
-                childrenIndexSet.add(rule.index);
-                rule.getChildren(parser, childrenIndexSet);
-            }
-            else if (word instanceof GrammarForge.Par) {
-                word.expression.getChildren(parser, childrenIndexSet);
-            }
+            word.getChildren(parser, childrenIndexSet);
         }
     }
 
@@ -236,6 +252,7 @@ GrammarForge.Expression.tags = new Set([
     'assign',//no_declare - optional info after tag for not having to declare first
     'get',
     'while',
+    'foreach',
     'for',
     'if',//Assumes the first stmt is the if body and the second is the else body (if present)
     'par',

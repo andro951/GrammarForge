@@ -1,4 +1,4 @@
-const LIB_VERSION = '1.0.0';
+const GRAMMAR_FORGE_LIB_VERSION = '1.0.0';
 const BASE_URL = 'https://andro951.github.io/GrammarForge/';
 
 const files = [
@@ -13,13 +13,22 @@ const files = [
   'grammarForge/grammarParser.js',
   'grammarForge/grammarParser/functions.js',
   'grammarForge/grammarParser/expression.js',
+  'grammarForge/grammarParser/wordBase.js',
   'grammarForge/grammarParser/word.js',
+  'grammarForge/grammarParser/qWord.js',
   'grammarForge/grammarParser/par.js',
+  'grammarForge/grammarParser/expList.js',
   'grammarForge/grammarParser/rule.js',
   'grammarForge/grammarParser/term.js',
   'grammarForge/flowControl.js',
-  'grammarForge/functionDeclaration.js'
-].map(f => BASE_URL + f + '?v=' + LIB_VERSION);
+  'grammarForge/functionDeclaration.js',
+  'testCaseGrammar/testCaseGrammar.js',
+  'scriptForge/scriptForge.js',
+  'scriptForge/script.js',
+  'scriptForge/scriptAction.js',
+  'scriptForge/scriptTrigger.js',
+  'scriptForge/scriptDataGetter.js',
+].map(f => BASE_URL + f + '?v=' + GRAMMAR_FORGE_LIB_VERSION);
 
 (function loadNext(index) {
   if (index >= files.length) {

@@ -3,6 +3,7 @@
 {
     const TokenDefinition = GrammarForge.TokenDefinition;
     const Token = GrammarForge.Token;
+    const debuggingLexer = false;
 
     GrammarForge.Lexer = class Lexer {
         constructor(tokenDefinitions) {
@@ -14,8 +15,11 @@
         }
 
         tokenize = (str) => {
-            // console.log("Starting tokenization...");
-            // console.log(`string:\n${str}\n`);
+            if (debuggingLexer) {
+                console.log("Starting tokenization...");
+                console.log(`string:\n${str}\n`);
+            }
+            
             this.str = str;
             this.tokens = [];
             this.index = 0;
@@ -30,10 +34,12 @@
                 this.tokens.push(token);
             }
 
-            // for (let i = 0; i < this.tokens.length; i++) {
-            //     const token = this.tokens[i];
-            //     console.log(`${i}: ${token.type} (${token.value})`);
-            // }
+            if (debuggingLexer) {
+                for (let i = 0; i < this.tokens.length; i++) {
+                    const token = this.tokens[i];
+                    console.log(`${i}: ${token.type} (${token.value})`);
+                }
+            }
 
             return this.tokens;
         }
