@@ -22,7 +22,6 @@ const files = [
   'grammarForge/grammarParser/term.js',
   'grammarForge/flowControl.js',
   'grammarForge/functionDeclaration.js',
-  'testCaseGrammar/testCaseGrammar.js',
   'scriptForge/scriptForge.js',
   'scriptForge/script.js',
   'scriptForge/scriptAction.js',
