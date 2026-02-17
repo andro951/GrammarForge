@@ -25,7 +25,7 @@ ScriptForge.ScriptAction = class ScriptAction {
             }
         }
 
-        this.action(...args);
+        this.action(args);
     }
 }
 
