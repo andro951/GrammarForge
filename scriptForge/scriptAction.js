@@ -15,7 +15,7 @@ ScriptForge.ScriptAction = class ScriptAction {
             }
         }
     }
-    run = (...args) => {
+    run = (args) => {
         if (!this.canCallAction())
             return;
         

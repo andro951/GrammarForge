@@ -41,7 +41,7 @@ const ScriptForge = class ScriptForge {
             throw new Error(`No script action found with name ${name}`);
         }
 
-        return action.run(...args);
+        return action.run(args);
     }
     scriptActionAvailable = (name) => {
         const action = this.scriptActions.get(name);
