@@ -52,7 +52,7 @@ const ScriptForge = class ScriptForge {
 
         return action.canCallAction();
     }
-    registerScript(scriptText) {
+    registerScript = (scriptText) => {
         const script = new ScriptForge.Script(scriptText);
         for (const existingScript of this.registeredScripts) {
             if (existingScript.scriptText === script.scriptText) {
@@ -72,5 +72,16 @@ const ScriptForge = class ScriptForge {
         const dataGetter = new ScriptForge.ScriptDataGetter(name, description, getter);
         this.allGetters.set(name, dataGetter);
         this.allGettersFunctions.set(name, getter);
+    }
+    registerAllScriptTriggers = () => {
+        for (const script of this.registeredScripts) {
+            for (const triggerName of script.triggers) {
+                const trigger = this.triggers.get(triggerName);
+                if (!trigger)
+                    console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
+
+                trigger.registerScript(script);
+            }
+        }
     }
 }
