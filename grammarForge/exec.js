@@ -378,6 +378,59 @@
             throw new Error(`Tried to set undefined variable: ${name}`);
         }
 
+        try_declare_then_set_variable = (name, val) => {
+            if (this.variableGetters && this.variableGetters.has(name)) {
+                throw new Error(`${name} is reserved for a global value.  It cannot be edited.`);
+            }
+
+            const variables = this.variables;
+
+            let found = false;
+            for (let i = variables.length - 1; i >= 0; i--) {
+                const scope = variables[i];
+                if (scope.has(name)) {
+                    found = true;
+                    scope.set(name, val);
+                }
+            }
+
+            if (!found) {
+                variables[variables.length - 1].set(name, val);
+            }
+
+            if (GrammarForge.debuggingFunctions) {
+                console.log(`${name} = ${val}`);
+            }
+        }
+
+        try_declare_then_set_variable_func = (name, func) => {
+            if (this.variableGetters && this.variableGetters.has(name)) {
+                throw new Error(`${name} is reserved for a global value.  It cannot be edited.`);
+            }
+
+            const variables = this.variables;
+
+            let found = false;
+            for (let i = variables.length - 1; i >= 0; i--) {
+                const scope = variables[i];
+                if (scope.has(name)) {
+                    found = true;
+                    const val = func();
+                    scope.set(name, val);
+                }
+            }
+
+            if (!found) {
+                const val = func();
+                variables[variables.length - 1].set(name, val);
+            }
+
+            if (GrammarForge.debuggingFunctions) {
+                const val = func();
+                console.log(`${name} = ${val}`);
+            }
+        }
+
         get_variable = (name) => {
             if (this.variableGetters && this.variableGetters.has(name)) {
                 return this.variableGetters.get(name)();
@@ -421,6 +474,7 @@
             const set_variable = execution.set_variable;
             const get_variable = execution.get_variable;
             const set_variable_func = execution.set_variable_func;
+            const try_declare_then_set_variable_func = execution.try_declare_then_set_variable_func;
             this.defaultExecFunctions = new Map([
                 ['sl', (stmt_list) => {
                     for (const stmt of stmt_list) {
@@ -529,7 +583,8 @@
                 }],
                 ['assign no_declare', (var_, exp) => {//Used if {assign no_declare} tag is set
                     const v = var_();
-                    declare_variable_func(v, exp);
+                    
+                    try_declare_then_set_variable_func(v, exp);
 
                     return GrammarForge.NORMAL_CONTROL;
                 }],
