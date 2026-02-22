@@ -296,7 +296,7 @@
 
         declare_variable = (name, val) => {
             if (this.variableGetters && this.variableGetters.has(name)) {
-                throw new Error(`${name} is already used.  It cannot be used as a variable name.`);
+                throw new Error(`${name} is reserved for a global value.  It cannot be used as a variable name.`);
             }
 
             const variables = this.variables;
@@ -315,7 +315,7 @@
 
         declare_variable_func = (name, func) => {
             if (this.variableGetters && this.variableGetters.has(name)) {
-                throw new Error(`${name} is already used.  It cannot be used as a variable name.`);
+                throw new Error(`${name} is reserved for a global value.  It cannot be used as a variable name.`);
             }
 
             const variables = this.variables;
@@ -334,6 +334,10 @@
         }
 
         set_variable = (name, val) => {
+            if (this.variableGetters && this.variableGetters.has(name)) {
+                throw new Error(`${name} is reserved for a global value.  It cannot be edited.`);
+            }
+            
             const variables = this.variables;
 
             for (let i = variables.length - 1; i >= 0; i--) {
@@ -352,6 +356,10 @@
         }
 
         set_variable_func = (name, func) => {
+            if (this.variableGetters && this.variableGetters.has(name)) {
+                throw new Error(`${name} is reserved for a global value.  It cannot be edited.`);
+            }
+
             const variables = this.variables;
 
             for (let i = variables.length - 1; i >= 0; i--) {
