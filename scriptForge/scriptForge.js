@@ -34,6 +34,7 @@ const ScriptForge = class ScriptForge {
         }
 
         this.triggers.set(name, trigger);
+        return trigger;
     }
     runScriptAction = (name, args) => {
         const action = this.scriptActions.get(name);
