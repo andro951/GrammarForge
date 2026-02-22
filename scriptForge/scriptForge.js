@@ -27,8 +27,8 @@ const ScriptForge = class ScriptForge {
         const scriptAction = new ScriptForge.ScriptAction(...args);
         this.addScriptAction(scriptAction);
     }
-    defineTrigger = (name, description) => {
-        const trigger = new ScriptForge.ScriptTrigger(name, description, this);
+    defineTrigger = (name, description, parameters) => {
+        const trigger = new ScriptForge.ScriptTrigger(name, description, parameters, this);
         if (this.triggers.has(name)) {
             throw new Error(`Trigger with name ${name} already exists`);
         }
