@@ -186,7 +186,13 @@ ScriptForge.Script = class Script {
         this.description = scriptDescription;
         this.author = scriptAuthor;
         this.version = scriptVersion;
+        if (!triggers)
+            throw new Error(`Script is missing required Triggers meta data.`);
+
         this.triggers = triggers.split(/[,\s]+/).filter(Boolean);//Split by comma/whitespace and ignore empty entries
+        if (this.triggers.length === 0)
+            throw new Error(`Script has no triggers defined.`);
+        
         this.ast = ast;
         this.fullAST = fullAST;
     }
