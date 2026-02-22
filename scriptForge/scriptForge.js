@@ -6,7 +6,7 @@ const ScriptForge = class ScriptForge {
         this.scriptActions = new Map();
         this.registeredScripts = [];
         this.allGetters = new Map();
-        this.allGettersVars = new Map();
+        this.allGettersFunctions = new Map();
         this.triggers = new Map();
     }
 
@@ -70,6 +70,6 @@ const ScriptForge = class ScriptForge {
     defineGetter = (name, description, getter) => {
         const dataGetter = new ScriptForge.ScriptDataGetter(name, description, getter);
         this.allGetters.set(name, dataGetter);
-        this.allGettersVars.set(name, getter);
+        this.allGettersFunctions.set(name, getter);
     }
 }

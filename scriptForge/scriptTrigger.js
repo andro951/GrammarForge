@@ -13,7 +13,7 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
     run = () => {
         for (const script of this.registeredScripts) {
             //TODO: possibly pass the static variables in instead of null, then update after?
-            ZonScript.gf.exec(script.ast, null, this.scriptForge.allGettersVars);
+            ZonScript.gf.exec(script.ast, null, this.scriptForge.allGettersFunctions);
         }
     }
 }
