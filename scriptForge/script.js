@@ -186,7 +186,7 @@ ScriptForge.Script = class Script {
         this.description = scriptDescription;
         this.author = scriptAuthor;
         this.version = scriptVersion;
-        this.triggers = triggers;
+        this.triggers = triggers.split(/[,\s]+/).filter(Boolean);//Split by comma/whitespace and ignore empty entries
         this.ast = ast;
         this.fullAST = fullAST;
     }
