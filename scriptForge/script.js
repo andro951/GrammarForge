@@ -180,18 +180,19 @@ ScriptForge.Script = class Script {
             }
         }
         
-        const [scriptTitle, scriptDescription, scriptAuthor, scriptVersion] = foundArr;
+        const [scriptTitle, scriptDescription, scriptAuthor, scriptVersion, triggers] = foundArr;
 
         this.title = scriptTitle;
         this.description = scriptDescription;
         this.author = scriptAuthor;
         this.version = scriptVersion;
+        this.triggers = triggers;
         this.ast = ast;
         this.fullAST = fullAST;
     }
 }
 
-ScriptForge.Script.metaLabels = ["Title", "Description", "Author", "Version"];
+ScriptForge.Script.metaLabels = ["Title", "Description", "Author", "Version", "Triggers"];
 ScriptForge.Script.metaLabelLookup = new Map();
 for (let i = 0; i < ScriptForge.Script.metaLabels.length; i++) {
     const label = ScriptForge.Script.metaLabels[i].toLowerCase();
