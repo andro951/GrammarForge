@@ -337,7 +337,7 @@
             if (this.variableGetters && this.variableGetters.has(name)) {
                 throw new Error(`${name} is reserved for a global value.  It cannot be edited.`);
             }
-            
+
             const variables = this.variables;
 
             for (let i = variables.length - 1; i >= 0; i--) {
@@ -528,26 +528,8 @@
                     return GrammarForge.NORMAL_CONTROL;
                 }],
                 ['assign no_declare', (var_, exp) => {//Used if {assign no_declare} tag is set
-                    const variables = execution.variables;
                     const v = var_();
-                    const val = exp();
-                    for (let i = variables.length - 1; i >= 0; i--) {
-                        const scope = variables[i];
-                        if (scope.has(v)) {
-                            scope.set(v, val);
-                            if (GrammarForge.debuggingFunctions) {
-                                console.log(`${v} = ${val}`);
-                            }
-
-                            return GrammarForge.NORMAL_CONTROL;
-                        }
-                    }
-
-                    const currentScope = variables[variables.length - 1];
-                    currentScope.set(v, val);
-                    if (GrammarForge.debuggingFunctions) {
-                        console.log(`${v} = ${val}`);
-                    }
+                    declare_variable_func(v, exp);
 
                     return GrammarForge.NORMAL_CONTROL;
                 }],
