@@ -59,7 +59,7 @@ const ScriptForge = class ScriptForge {
                 throw new Error(`This script is already registered: ${existingScript.title !== null ? existingScript.title : existingScript.scriptText}.`);
             }
 
-            if (existingScript.title === script.title) {
+            if (script.title && existingScript.title === script.title) {
                 if (existingScript.description === script.description)
                     throw new Error(`A script with the title "${script.title}" and the same description is already registered.`);
             }
