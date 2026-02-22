@@ -37,6 +37,9 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
         return (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean');
     }
     run = (args = null) => {
+        if (this.registeredScripts.length === 0)
+            return;
+        
         ScriptForge.ScriptTrigger.argsMap.clear();
 
         if (args !== null) {
