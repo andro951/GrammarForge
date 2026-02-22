@@ -44,13 +44,13 @@ const ScriptForge = class ScriptForge {
 
         return action.run(args);
     }
-    scriptActionAvailable = (name) => {
+    scriptActionAvailable = (name, args) => {
         const action = this.scriptActions.get(name);
         if (!action) {
             throw new Error(`No script action found with name ${name}`);
         }
 
-        return action.canCallAction();
+        return action.canCallAction(args);
     }
     registerScript = (scriptText) => {
         const script = new ScriptForge.Script(scriptText);

@@ -16,14 +16,14 @@ ScriptForge.ScriptAction = class ScriptAction {
         }
     }
     run = (args) => {
-        if (!this.canCallAction())
-            return;
-        
         if (this.parameters != null) {
             if (args.length != this.parameters.length) {
                 throw new Error(`Error when trying to call ${this.name}: Expected ${this.parameters.length} arguments, but got ${args.length}.  arguments: ${args}`);
             }
         }
+
+        if (!this.canCallAction(args))
+            return;
 
         this.action(args);
     }
