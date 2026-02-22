@@ -46,7 +46,7 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
         }
         
         for (const script of this.registeredScripts) {
-            ZonScript.gf.exec(script.ast, argsMap, this.scriptForge.allGettersFunctions);
+            this.scriptForge.gf.exec(script.ast, argsMap, this.scriptForge.allGettersFunctions);
         }
     }
 }
