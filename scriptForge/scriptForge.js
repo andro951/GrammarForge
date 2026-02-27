@@ -4,7 +4,7 @@ const ScriptForge = class ScriptForge {
     constructor(grammarForge) {
         this.gf = grammarForge;
         this.scriptActions = new Map();
-        this.registeredScripts = [];
+        this.registeredScripts = new Map();
         this.allGetters = new Map();
         this.allGettersFunctions = new Map();
         this.triggers = new Map();
@@ -52,20 +52,14 @@ const ScriptForge = class ScriptForge {
 
         return action.canCallAction(args);
     }
-    registerScript = (scriptText) => {
-        const script = new ScriptForge.Script(scriptText);
-        for (const existingScript of this.registeredScripts) {
-            if (existingScript.scriptText === script.scriptText) {
-                throw new Error(`This script is already registered: ${existingScript.title !== null ? existingScript.title : existingScript.scriptText}.`);
-            }
-
-            if (script.title && existingScript.title === script.title) {
-                if (existingScript.description === script.description)
-                    throw new Error(`A script with the title "${script.title}" and the same description is already registered.`);
-            }
+    registerScript = (key, scriptText) => {
+        if (this.registeredScripts.has(key)) {
+            console.error(`A script with the key "${key}" is already registered.`);
+            return null;
         }
 
-        this.registeredScripts.push(script);
+        const script = new ScriptForge.Script(scriptText);
+        this.registeredScripts.set(key, script);
         return script;
     }
     defineGetter = (name, description, getter) => {
@@ -74,7 +68,7 @@ const ScriptForge = class ScriptForge {
         this.allGettersFunctions.set(name, getter);
     }
     registerAllScriptTriggers = () => {
-        for (const script of this.registeredScripts) {
+        for (const script of this.registeredScripts.values()) {
             for (const triggerName of script.triggers) {
                 const trigger = this.triggers.get(triggerName);
                 if (!trigger)
