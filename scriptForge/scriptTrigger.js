@@ -27,17 +27,20 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
         if (!(scriptForge instanceof ScriptForge))
             throw new Error('scriptForge must be an instance of ScriptForge');
 
-        this.registeredScripts = [];
+        this.registeredScripts = new Map();
     }
-    registerScript = (script) => {
-        this.registeredScripts.push(script);
+    registerScript = (key, script) => {
+        this.registeredScripts.set(key, script);
+    }
+    unregisterScript = (key) => {
+        this.registeredScripts.delete(key);
     }
     static argsMap = new Map();
     static isSimpleType = (value) => {
         return (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean');
     }
     run = (args = null) => {
-        if (this.registeredScripts.length === 0)
+        if (this.registeredScripts.size === 0)
             return;
         
         ScriptForge.ScriptTrigger.argsMap.clear();
@@ -73,7 +76,7 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
             }
         }
         
-        for (const script of this.registeredScripts) {
+        for (const [key, script] of this.registeredScripts) {
             this.scriptForge.gf.exec(script.ast, ScriptForge.ScriptTrigger.argsMap, this.scriptForge.allGettersFunctions);
         }
     }

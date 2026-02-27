@@ -62,19 +62,35 @@ const ScriptForge = class ScriptForge {
         this.registeredScripts.set(key, script);
         return script;
     }
+    unregisterScript = (key) => {
+        if (!this.registeredScripts.has(key)) {
+            console.error(`No script found with the key "${key}".`);
+            return;
+        }
+
+        for (const triggerName of script.triggers) {
+                const trigger = this.triggers.get(triggerName);
+                if (!trigger)
+                    console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
+
+                trigger.unregisterScript(key);
+        }
+
+        this.registeredScripts.delete(key);
+    }
     defineGetter = (name, description, getter) => {
         const dataGetter = new ScriptForge.ScriptDataGetter(name, description, getter);
         this.allGetters.set(name, dataGetter);
         this.allGettersFunctions.set(name, getter);
     }
     registerAllScriptTriggers = () => {
-        for (const script of this.registeredScripts.values()) {
+        for (const [key, script] of this.registeredScripts) {
             for (const triggerName of script.triggers) {
                 const trigger = this.triggers.get(triggerName);
                 if (!trigger)
                     console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
 
-                trigger.registerScript(script);
+                trigger.registerScript(key, script);
             }
         }
     }
