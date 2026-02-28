@@ -143,6 +143,7 @@ const ScriptForge = class ScriptForge {
             if (!trigger) {
                 if (this.onParseScriptErrorFunction) {
                     const error = new ScriptForge.BadTriggerNameError(`"${triggerName}" is not a valid trigger name.`);
+                    error.badTriggerName = triggerName;
                     this.onParseScriptErrorFunction(error, key, script.scriptText);
                 }
 
