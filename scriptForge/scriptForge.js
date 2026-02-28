@@ -89,7 +89,7 @@ const ScriptForge = class ScriptForge {
 
         return action.canCallAction(args);
     }
-    registerScript = (key, scriptText) => {
+    registerScript = (key, scriptText, registerWithTriggers = false) => {
         if (this.registeredScripts.has(key)) {
             console.error(`A script with the key "${key}" is already registered.`);
             return null;
@@ -98,6 +98,9 @@ const ScriptForge = class ScriptForge {
         try {
             const script = new ScriptForge.Script(scriptText);
             this.registeredScripts.set(key, script);
+            if (registerWithTriggers)
+                this.registerScriptWithItsTriggers(script);
+            
             return script;
         }
         catch (e) {
@@ -128,12 +131,24 @@ const ScriptForge = class ScriptForge {
         this.allGetters.set(name, dataGetter);
         this.allGettersFunctions.set(name, getter);
     }
+    static BadTriggerNameError = class BadTriggerNameError extends Error {
+        constructor(message) {
+            super(message);
+            this.name = "BadTriggerNameError";
+        }
+    }
     registerScriptWithItsTriggers = (script) => {
         for (const triggerName of script.triggers) {
             const trigger = this.triggers.get(triggerName);
-            if (!trigger)
-                console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
+            if (!trigger) {
+                if (this.onParseScriptErrorFunction) {
+                    const error = new ScriptForge.BadTriggerNameError(`"${triggerName}" is not a valid trigger name.`);
+                    this.onParseScriptErrorFunction(error, key, script.scriptText);
+                }
 
+                continue;
+            }
+            
             trigger.registerScript(key, script);
         }
     }
