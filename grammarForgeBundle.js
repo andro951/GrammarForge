@@ -1,4 +1,4 @@
-const GRAMMAR_FORGE_LIB_VERSION = '1.0.9';
+const GRAMMAR_FORGE_LIB_VERSION = '1.0.10';
 const BASE_URL = 'https://andro951.github.io/GrammarForge/';
 
 const files = [
@@ -33,7 +33,7 @@ const files = [
   if (index >= files.length) {
     const evt = new Event('GrammarForgeLoaded');
     window.dispatchEvent(evt);
-    console.log('GrammarForge fully loaded');
+    console.log(`GrammarForge ${GRAMMAR_FORGE_LIB_VERSION} fully loaded`);
     return;
   }
 
