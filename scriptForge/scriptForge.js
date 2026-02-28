@@ -96,7 +96,7 @@ const ScriptForge = class ScriptForge {
         }
 
         try {
-            const script = new ScriptForge.Script(scriptText);
+            const script = new ScriptForge.Script(key, scriptText);
             this.registeredScripts.set(key, script);
             if (registerWithTriggers)
                 this.registerScriptWithItsTriggers(key, script);
