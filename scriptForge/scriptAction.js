@@ -16,7 +16,13 @@ ScriptForge.ScriptAction = class ScriptAction {
             }
         }
     }
-    static ScriptActionInvalidArgumentsError = class ScriptActionInvalidArgumentsError extends Error {
+    static ScriptActionError = class ScriptActionError extends Error {
+        constructor(message) {
+            super(message);
+            this.name = "ScriptActionError";
+        }
+    }
+    static ScriptActionInvalidArgumentsError = class ScriptActionInvalidArgumentsError extends ScriptActionError {
         constructor(message) {
             super(message);
             this.name = "ScriptActionInvalidArgumentsError";
