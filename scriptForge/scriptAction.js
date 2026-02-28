@@ -16,16 +16,18 @@ ScriptForge.ScriptAction = class ScriptAction {
             }
         }
     }
-    static ScriptActionError = class ScriptActionError extends Error {
-        constructor(message) {
-            super(message);
-            this.name = "ScriptActionError";
+    static {
+        this.ScriptActionError = class ScriptActionError extends Error {
+            constructor(message) {
+                super(message);
+                this.name = "ScriptActionError";
+            }
         }
-    }
-    static ScriptActionInvalidArgumentsError = class ScriptActionInvalidArgumentsError extends ScriptActionError {
-        constructor(message) {
-            super(message);
-            this.name = "ScriptActionInvalidArgumentsError";
+        this.ScriptActionInvalidArgumentsError = class ScriptActionInvalidArgumentsError extends this.ScriptActionError {
+            constructor(message) {
+                super(message);
+                this.name = "ScriptActionInvalidArgumentsError";
+            }
         }
     }
     run = (args) => {
