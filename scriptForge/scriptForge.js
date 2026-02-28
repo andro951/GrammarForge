@@ -99,7 +99,7 @@ const ScriptForge = class ScriptForge {
             const script = new ScriptForge.Script(scriptText);
             this.registeredScripts.set(key, script);
             if (registerWithTriggers)
-                this.registerScriptWithItsTriggers(script);
+                this.registerScriptWithItsTriggers(key, script);
             
             return script;
         }
@@ -137,7 +137,7 @@ const ScriptForge = class ScriptForge {
             this.name = "BadTriggerNameError";
         }
     }
-    registerScriptWithItsTriggers = (script) => {
+    registerScriptWithItsTriggers = (key, script) => {
         for (const triggerName of script.triggers) {
             const trigger = this.triggers.get(triggerName);
             if (!trigger) {
@@ -155,7 +155,7 @@ const ScriptForge = class ScriptForge {
     }
     registerAllScriptTriggers = () => {
         for (const [key, script] of this.registeredScripts) {
-            this.registerScriptWithItsTriggers(script);
+            this.registerScriptWithItsTriggers(key, script);
         }
     }
 }
