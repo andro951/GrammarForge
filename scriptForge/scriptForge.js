@@ -1,15 +1,51 @@
 "use strict";
 
 const ScriptForge = class ScriptForge {
-    constructor(grammarForge) {
+    //onErrorInScriptFunction:
+    //  Parameters: (error, trigger, arguments, script)
+    //  Called when there is an error when running a script.
+    //  Errors will automatically disable the script.
+    
+    //onErrorDuringActionFunction:
+    //  Parameters: (error, action, arguments, script)
+    //  Called when there is an error during execution of a script action.
+    //  Return true if the error was handled.  Return false if the error was not handled, and the error should be thrown again to be caught by onErrorInScriptFunction.
+    
+    //onParseScriptErrorFunction:
+    //  Parameters: (error, key, scriptText)
+    //  Called when there is an error parsing a script.
+    //  The script will not be registered if there is a parse error.
+    constructor(grammarForge, { onErrorInScriptFunction = null, onErrorDuringActionFunction = null, onParseScriptErrorFunction = null }) {
+        if (!(grammarForge instanceof GrammarForge))
+            throw new Error('grammarForge must be an instance of GrammarForge');
+            
         this.gf = grammarForge;
+
+        if (typeof onErrorInScriptFunction !== 'function' && onErrorInScriptFunction !== null)
+            throw new Error('onErrorInScriptFunction must be a function or null');
+
+        this.onErrorInScriptFunction = onErrorInScriptFunction;
+
+        if (typeof onErrorDuringActionFunction !== 'function' && onErrorDuringActionFunction !== null)
+            throw new Error('onErrorDuringActionFunction must be a function or null');
+
+        this.onErrorDuringActionFunction = onErrorDuringActionFunction;
+
+        if (typeof onParseScriptErrorFunction !== 'function' && onParseScriptErrorFunction !== null)
+            throw new Error('onParseScriptErrorFunction must be a function or null');
+
+        this.onParseScriptErrorFunction = onParseScriptErrorFunction;
+
         this.scriptActions = new Map();
         this.registeredScripts = new Map();
         this.allGetters = new Map();
         this.allGettersFunctions = new Map();
         this.triggers = new Map();
+        this.scriptCallStack = [];
     }
-
+    executingScript = () => {
+        return this.scriptCallStack[this.scriptCallStack.length - 1];
+    }
     addScriptAction = (scriptAction) => {
         if (!(scriptAction instanceof ScriptForge.ScriptAction)) {
             throw new Error('scriptAction must be an instance of ScriptAction');
@@ -21,6 +57,7 @@ const ScriptForge = class ScriptForge {
         }
 
         this.scriptActions.set(scriptAction.name, scriptAction);
+        scriptAction.scriptForge = this;
     }
 
     defineScriptAction = (...args) => {
@@ -42,7 +79,7 @@ const ScriptForge = class ScriptForge {
             throw new Error(`No script action found with name ${name}`);
         }
 
-        return action.run(args);
+        action.run(args);
     }
     scriptActionAvailable = (name, args) => {
         const action = this.scriptActions.get(name);
@@ -58,9 +95,17 @@ const ScriptForge = class ScriptForge {
             return null;
         }
 
-        const script = new ScriptForge.Script(scriptText);
-        this.registeredScripts.set(key, script);
-        return script;
+        try {
+            const script = new ScriptForge.Script(scriptText);
+            this.registeredScripts.set(key, script);
+            return script;
+        }
+        catch (e) {
+            if (this.onParseScriptErrorFunction)
+                this.onParseScriptErrorFunction(e, key, scriptText);
+
+            return null;
+        }
     }
     unregisterScript = (key) => {
         if (!this.registeredScripts.has(key)) {
@@ -69,11 +114,11 @@ const ScriptForge = class ScriptForge {
         }
 
         for (const triggerName of script.triggers) {
-                const trigger = this.triggers.get(triggerName);
-                if (!trigger)
-                    console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
+            const trigger = this.triggers.get(triggerName);
+            if (!trigger)
+                console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
 
-                trigger.unregisterScript(key);
+            trigger.unregisterScript(key);
         }
 
         this.registeredScripts.delete(key);

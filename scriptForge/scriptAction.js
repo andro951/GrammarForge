@@ -7,6 +7,7 @@ ScriptForge.ScriptAction = class ScriptAction {
         this.canCallAction = canCallAction;
         this.description = description;
         this.parameters = parameters;
+        this.scriptForge = null;//Set when registered to ScriptForge
         if (parameters != null) {
             for (let parameter of parameters) {
                 if (!(parameter instanceof ScriptForge.ScriptActionParameter)) {
@@ -15,17 +16,29 @@ ScriptForge.ScriptAction = class ScriptAction {
             }
         }
     }
-    run = (args) => {
-        if (this.parameters != null) {
-            if (args.length != this.parameters.length) {
-                throw new Error(`Error when trying to call ${this.name}: Expected ${this.parameters.length} arguments, but got ${args.length}.  arguments: ${args}`);
-            }
+    static ScriptActionInvalidArgumentsError = class ScriptActionInvalidArgumentsError extends Error {
+        constructor(message) {
+            super(message);
+            this.name = "ScriptActionInvalidArgumentsError";
         }
+    }
+    run = (args) => {
+        try {
+            if (this.parameters != null) {
+                if (args.length != this.parameters.length) {
+                    throw new ScriptForge.ScriptAction.ScriptActionInvalidArgumentsError(`Error when trying to call ${this.name}: Expected ${this.parameters.length} arguments, but got ${args.length}.  arguments: ${args}`);
+                }
+            }
 
-        if (!this.canCallAction(args))
-            return;
+            if (!this.canCallAction(args))
+                return;
 
-        this.action(args);
+            this.action(args);
+        } catch (e) {
+            const resume = this.onErrorDuringActionFunction ? this.onErrorDuringActionFunction(e, this, args, this.scriptForge.executingScript()) : false;
+            if (!resume)
+                throw e;
+        }
     }
 }
 

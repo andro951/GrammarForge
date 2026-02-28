@@ -42,6 +42,17 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
     run = (args = null) => {
         if (this.registeredScripts.size === 0)
             return;
+
+        let anyEnabled = false;
+        for (const script of this.registeredScripts.values()) {
+            if (script.enabled) {
+                anyEnabled = true;
+                break;
+            }
+        }
+
+        if (!anyEnabled)
+            return;
         
         ScriptForge.ScriptTrigger.argsMap.clear();
 
@@ -77,7 +88,21 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
         }
         
         for (const [key, script] of this.registeredScripts) {
-            this.scriptForge.gf.exec(script.ast, ScriptForge.ScriptTrigger.argsMap, this.scriptForge.allGettersFunctions);
+            if (!script.enabled)
+                continue;
+            
+            this.scriptForge.scriptCallStack.push(script);
+            try {
+                this.scriptForge.gf.exec(script.ast, ScriptForge.ScriptTrigger.argsMap, this.scriptForge.allGettersFunctions);
+            }
+            catch (e) {
+                if (this.scriptForge.onErrorInScriptFunction)
+                    this.scriptForge.onErrorInScriptFunction(e, this, args, script);
+                
+                script.enabled = false;
+            }
+
+            this.scriptForge.scriptCallStack.pop();
         }
     }
 }

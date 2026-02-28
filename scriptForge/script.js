@@ -4,6 +4,7 @@ ScriptForge.Script = class Script {
     constructor(scriptText) {
         this.scriptText = scriptText;
         this.extractScriptFromText();
+        this.enabled = true;
     }
     extractScriptFromText = () => {
         const scriptText = this.scriptText;
