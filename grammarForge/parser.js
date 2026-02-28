@@ -6,6 +6,8 @@
             this.rules = rules;
             this.lexer = lexer;
             this.tokens = [];
+            this.parseTokenFunctions = new Map();
+            this.populateParseTokenFunctions();
             this.checkDuplicateRuleNames();
             this.tokenTags = new Map();
             for (let tokenDef of this.lexer.tokenDefinitions) {
@@ -178,24 +180,42 @@
             return this.tokenToAST(token);
         }
 
-        tokenToAST = (token) => {
-            const tag = this.tokenTags.get(token.type);
-            switch (tag) {
-                case 'int':
-                    return ['TOKEN', token.type, parseInt(token.value)];
-                case 'float':
-                    //TODO: if parseFloat fails because the number is too big, parse BigNum instead.
-                    return ['TOKEN', token.type, parseFloat(token.value)];
-                case 'bool':
-                    return ['TOKEN', token.type, token.value === 'true'];
-                case 'string':
+        populateParseTokenFunctions = () => {
+            this.parseTokenFunctions = new Map([
+                ['int', (token) => {
+                    const value = parseInt(token.value);
+                    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER)
+                        throw new Error(`Integer value ${token.value} is out of safe integer range.`);
+
+                    if (!isFinite(value))
+                        throw new Error(`Invalid integer value: ${token.value}`);
+
+                    return value;
+                }],
+                ['float', (token) => {
+                    const value = parseFloat(token.value);
+                    if (!isFinite(value))
+                        throw new Error(`Invalid float value: ${token.value}`);
+
+                    return value;
+                }],
+                ['bool', (token) => ['TOKEN', token.type, token.value === 'true']],
+                ['string', (token) => {
                     const s = token.value.substring(1, token.value.length - 1);
                     return ['TOKEN', token.type, s];
-                case null:
-                    return ['TOKEN', token.type, token.value];
-                default:
-                    throw new Error(`Unknown token tag: ${token.tag}`);
-            }
+                }],
+                [null, (token) => ['TOKEN', token.type, token.value]],
+            ]);
+        }
+
+        tokenToAST = (token) => {
+            const tag = this.tokenTags.get(token.type);
+            const parseFunction = this.parseTokenFunctions.get(tag);
+            if (!parseFunction)
+                throw new Error(`No parse function found for token type ${token.type} with tag ${tag}`);
+            
+            const value = parseFunction(token);
+            return ['TOKEN', token.type, value];
         }
 
         symbol = (tokenStream, symbol) => {
