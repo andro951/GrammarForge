@@ -128,15 +128,18 @@ const ScriptForge = class ScriptForge {
         this.allGetters.set(name, dataGetter);
         this.allGettersFunctions.set(name, getter);
     }
+    registerScriptWithItsTriggers = (script) => {
+        for (const triggerName of script.triggers) {
+            const trigger = this.triggers.get(triggerName);
+            if (!trigger)
+                console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
+
+            trigger.registerScript(key, script);
+        }
+    }
     registerAllScriptTriggers = () => {
         for (const [key, script] of this.registeredScripts) {
-            for (const triggerName of script.triggers) {
-                const trigger = this.triggers.get(triggerName);
-                if (!trigger)
-                    console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
-
-                trigger.registerScript(key, script);
-            }
+            this.registerScriptWithItsTriggers(script);
         }
     }
 }
