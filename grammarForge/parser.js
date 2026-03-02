@@ -199,12 +199,12 @@
 
                     return value;
                 }],
-                ['bool', (token) => ['TOKEN', token.type, token.value === 'true']],
+                ['bool', (token) => token.value === 'true'],
                 ['string', (token) => {
                     const s = token.value.substring(1, token.value.length - 1);
-                    return ['TOKEN', token.type, s];
+                    return s;
                 }],
-                [null, (token) => ['TOKEN', token.type, token.value]],
+                [null, (token) => token.value],
             ]);
         }
 
