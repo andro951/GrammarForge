@@ -100,6 +100,7 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
                     this.scriptForge.onErrorInScriptFunction(e, this, args, script);
                 
                 script.enabled = false;
+                script.error = e.toString();
             }
 
             this.scriptForge.scriptCallStack.pop();

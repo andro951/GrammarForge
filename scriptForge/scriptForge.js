@@ -95,20 +95,15 @@ const ScriptForge = class ScriptForge {
             return null;
         }
 
-        try {
-            const script = new ScriptForge.Script(key, scriptText);
-            this.registeredScripts.set(key, script);
-            if (registerWithTriggers)
-                this.registerScriptWithItsTriggers(key, script);
-            
-            return script;
-        }
-        catch (e) {
-            if (this.onParseScriptErrorFunction)
-                this.onParseScriptErrorFunction(e, key, scriptText);
+        const script = new ScriptForge.Script(key, scriptText);
+        this.registeredScripts.set(key, script);
+        if (script.enabled && registerWithTriggers)
+            this.registerScriptWithItsTriggers(key, script);
 
-            return null;
-        }
+        if (script.error && this.onParseScriptErrorFunction)
+            this.onParseScriptErrorFunction(script.error, key, scriptText);
+        
+        return script;
     }
     unregisterScript = (key) => {
         if (!this.registeredScripts.has(key)) {
