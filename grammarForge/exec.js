@@ -469,12 +469,12 @@
 
         makeDefaultExecFunctions = () => {
             const execution = this;
-            const declare_variable_func = execution.declare_variable_func;
-            const declare_variable_default_value = execution.declare_variable_default_value;
-            const set_variable = execution.set_variable;
-            const get_variable = execution.get_variable;
-            const set_variable_func = execution.set_variable_func;
-            const try_declare_then_set_variable_func = execution.try_declare_then_set_variable_func;
+            const declare_variable_func = (...args) => execution.declare_variable_func(...args);
+            const declare_variable_default_value = (...args) => execution.declare_variable_default_value(...args);
+            const set_variable = (...args) => execution.set_variable(...args);
+            const get_variable = (...args) => execution.get_variable(...args);
+            const set_variable_func = (...args) => execution.set_variable_func(...args);
+            const try_declare_then_set_variable_func = (...args) => execution.try_declare_then_set_variable_func(...args);
             this.defaultExecFunctions = new Map([
                 ['sl', (stmt_list) => {
                     for (const stmt of stmt_list) {
