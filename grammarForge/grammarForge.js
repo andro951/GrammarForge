@@ -120,16 +120,23 @@ const GrammarForge = class GrammarForge {
         return this.execution.exec(ast, variables, variableGetters);
     }
 
-    replaceOpFunction = (op, func) => {
-        if (typeof op !== 'string')
+    replaceOpFunction = (opTag, func) => {
+        if (typeof opTag !== 'string')
             throw new Error(`Operator must be a string.`);
 
         if (typeof func !== 'function')
             throw new Error(`Function must be a function.`);
 
-        const precedence = GrammarForge.Expression.operatorTagPrecedence.get(op);
+        const precedence = GrammarForge.Expression.operatorTagPrecedence.get(opTag);
         if (precedence === undefined)
-            throw new Error(`Unknown operator: ${op}`);
+            throw new Error(`Unknown operator: ${opTag}`);
+
+        const op = GrammarForge.Expression.operatorTagToOperator.get(opTag);
+        if (op === undefined)
+            throw new Error(`Operator tag ${opTag} does not correspond to a valid operator.`);
+
+        if (!this.execution.opFunctions[precedence].has(op))
+            throw new Error(`Operator ${op} not defined in precedence level ${precedence}`);
 
         this.execution.opFunctions[precedence].set(op, func);
     }

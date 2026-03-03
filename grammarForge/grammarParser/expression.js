@@ -300,6 +300,26 @@ GrammarForge.Expression.operatorTagPrecedence = new Map([
     ['^', 6],
 ]);
 
+GrammarForge.Expression.operatorTagToOperator = new Map([
+    ['+', '+'],
+    ['-', '-'],
+    ['*', '*'],
+    ['/', '/'],
+    ['%', '%'],
+    ['==', '=='],
+    ['!=', '!='],
+    ['<', '<'],
+    ['<=', '<='],
+    ['>', '>'],
+    ['>=', '>='],
+    ['&&', '&&'],
+    ['||', '||'],
+    ['!', '!'],
+    ['^', '^'],
+    ['-#', '-'],
+    ['+#', '+'],
+])
+
 GrammarForge.Expression.operatorTags = new Set([
     '+',
     '-',
