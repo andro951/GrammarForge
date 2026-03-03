@@ -119,6 +119,20 @@ const GrammarForge = class GrammarForge {
     exec = (ast, variables = null, variableGetters = null) => {
         return this.execution.exec(ast, variables, variableGetters);
     }
+
+    replaceOpFunction = (op, func) => {
+        if (typeof op !== 'string')
+            throw new Error(`Operator must be a string.`);
+
+        if (typeof func !== 'function')
+            throw new Error(`Function must be a function.`);
+
+        const precedence = GrammarForge.Expression.operatorTagPrecedence.get(op);
+        if (precedence === undefined)
+            throw new Error(`Unknown operator: ${op}`);
+
+        this.execution.opFunctions[precedence].set(op, func);
+    }
 };
 
 GrammarForge.debuggingFunctions = false;

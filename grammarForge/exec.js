@@ -717,7 +717,7 @@
                 }],
             ]);
 
-            this.defaultOpFunctions = [
+            this.opFunctions = [
                 new Map([
                     ['||', (left, right) => left || right],
                 ]),

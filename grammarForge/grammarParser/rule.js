@@ -746,7 +746,7 @@ GrammarForge.Rule = class Rule {
                         throw new Error(`Mismatched precedence levels found for operators in op rule: ${parFirstWord.string} in expression: ${expression.expressionString} in rule: ${this.name}.  All operators in an op rule must have the same precedence level.  Found operators: ${ops.join(", ")}`);
                 }
 
-                const funcMap = exec.defaultOpFunctions[precedenceLevel];
+                const funcMap = exec.opFunctions[precedenceLevel];
                 if (!funcMap)
                     throw new Error(`No default op functions found at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -866,7 +866,7 @@ GrammarForge.Rule = class Rule {
                         throw new Error(`Mismatched precedence levels found for operators in op rule: ${firstWord.string} in expression: ${expression.expressionString} in rule: ${this.name}.  All operators in an op rule must have the same precedence level.  Found operators: ${ops.join(", ")}`);
                 }
 
-                const funcMap = exec.defaultOpFunctions[precedenceLevel];
+                const funcMap = exec.opFunctions[precedenceLevel];
                 if (!funcMap)
                     throw new Error(`No default op functions found at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -964,7 +964,7 @@ GrammarForge.Rule = class Rule {
                     throw new Error(`Mismatched precedence levels found for operators in op rule: ${secondWord.string} in expression: ${expression.expressionString} in rule: ${this.name}.  All operators in an op rule must have the same precedence level.  Found operators: ${ops.join(", ")}`);
             }
 
-            const funcMap = exec.defaultOpFunctions[precedenceLevel];
+            const funcMap = exec.opFunctions[precedenceLevel];
             if (!funcMap)
                 throw new Error(`No default op functions found at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
