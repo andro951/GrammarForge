@@ -750,77 +750,41 @@ GrammarForge.Rule = class Rule {
                 if (!funcMap)
                     throw new Error(`No default op functions found at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
-                if (ops.length == 1) {
-                    const baseFunc = funcMap.get(firstOp);
-                    if (!baseFunc)
-                        throw new Error(`No default op function found for operator: ${firstOp} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
+                if (questionPar) {
+                    func = (arr) => {
+                        const [ exp_n_1, optionalArr ] = arr;
+                        const left = exp_n_1();
+                        if (optionalArr === null)
+                            return left;
 
-                    if (questionPar) {
-                        func = (arr) => {
-                            const [ exp_n_1, optionalParArr ] = arr;
-                            const left = exp_n_1();
-                            if (optionalParArr === null)
-                                return left;
+                        const [ op_n, exp_n ] = optionalArr;
+                        const right = exp_n();
+                        const op = op_n();
+                        const baseFunc = funcMap.get(op);
+                        if (!baseFunc)
+                            throw new Error(`No default op function found for operator: ${op} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
-                            const [ op_n, exp_n ] = optionalParArr;
-
-                            const right = exp_n();
-                            return baseFunc(left, right);
-                        }
-                    }
-                    else {
-                        func = (arr) => {
-                            const [ exp_n_1, optionalArr ] = arr;
-                            let result = exp_n_1();
-                            if (optionalArr === null)
-                                return result;
-
-                            for (const [ op_n, exp_n ] of optionalArr) {
-                                const right = exp_n();
-                                result = baseFunc(result, right);
-                            }
-
-                            return result;
-                        }
+                        return baseFunc(left, right);
                     }
                 }
                 else {
-                    if (questionPar) {
-                        func = (arr) => {
-                            const [ exp_n_1, optionalArr ] = arr;
-                            const left = exp_n_1();
-                            if (optionalArr === null)
-                                return left;
+                    func = (arr) => {
+                        const [ exp_n_1, optionalArr ] = arr;
+                        let result = exp_n_1();
+                        if (optionalArr === null)
+                            return result;
 
-                            const [ op_n, exp_n ] = optionalArr;
+                        for (const [ op_n, exp_n ] of optionalArr) {
                             const right = exp_n();
                             const op = op_n();
                             const baseFunc = funcMap.get(op);
                             if (!baseFunc)
                                 throw new Error(`No default op function found for operator: ${op} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
-                            return baseFunc(left, right);
+                            result = baseFunc(result, right);
                         }
-                    }
-                    else {
-                        func = (arr) => {
-                            const [ exp_n_1, optionalArr ] = arr;
-                            let result = exp_n_1();
-                            if (optionalArr === null)
-                                return result;
 
-                            for (const [ op_n, exp_n ] of optionalArr) {
-                                const right = exp_n();
-                                const op = op_n();
-                                const baseFunc = funcMap.get(op);
-                                if (!baseFunc)
-                                    throw new Error(`No default op function found for operator: ${op} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
-
-                                result = baseFunc(result, right);
-                            }
-
-                            return result;
-                        }
+                        return result;
                     }
                 }
             }
@@ -870,28 +834,15 @@ GrammarForge.Rule = class Rule {
                 if (!funcMap)
                     throw new Error(`No default op functions found at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
-                if (ops.length == 1) {
-                    const baseFunc = funcMap.get(firstOp);
+                func = (arr) => {
+                    const [ op_n, exp_n ] = arr;
+                    const op = op_n();
+                    const value = exp_n();
+                    const baseFunc = funcMap.get(op);
                     if (!baseFunc)
-                        throw new Error(`No default op function found for operator: ${firstOp} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
+                        throw new Error(`No default op function found for operator: ${op} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
-                    func = (arr) => {
-                        const [ op_n, exp_n ] = arr;
-                        const value = exp_n();
-                        return baseFunc(value);
-                    }
-                }
-                else {
-                    func = (arr) => {
-                        const [ op_n, exp_n ] = arr;
-                        const op = op_n();
-                        const value = exp_n();
-                        const baseFunc = funcMap.get(op);
-                        if (!baseFunc)
-                            throw new Error(`No default op function found for operator: ${op} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
-
-                        return baseFunc(value);
-                    }
+                    return baseFunc(value);
                 }
             }
             else {
@@ -968,30 +919,16 @@ GrammarForge.Rule = class Rule {
             if (!funcMap)
                 throw new Error(`No default op functions found at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
-            if (ops.length == 1) {
-                const baseFunc = funcMap.get(firstOp);
+            func = (arr) => {
+                const [ exp_n_1, op_n, exp_n ] = arr;
+                const left = exp_n_1();
+                const right = exp_n();
+                const op = op_n();
+                const baseFunc = funcMap.get(op);
                 if (!baseFunc)
-                    throw new Error(`No default op function found for operator: ${firstOp} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
+                    throw new Error(`No default op function found for operator: ${op} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
 
-                func = (arr) => {
-                    const [ exp_n_1, op_n, exp_n ] = arr;
-                    const left = exp_n_1();
-                    const right = exp_n();
-                    return baseFunc(left, right);
-                }
-            }
-            else {
-                func = (arr) => {
-                    const [ exp_n_1, op_n, exp_n ] = arr;
-                    const left = exp_n_1();
-                    const right = exp_n();
-                    const op = op_n();
-                    const baseFunc = funcMap.get(op);
-                    if (!baseFunc)
-                        throw new Error(`No default op function found for operator: ${op} at precedence level: ${precedenceLevel} in expression: ${expression.expressionString} in rule: ${this.name}`);
-
-                    return baseFunc(left, right);
-                }
+                return baseFunc(left, right);
             }
         }
 
