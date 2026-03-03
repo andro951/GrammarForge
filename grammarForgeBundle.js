@@ -1,4 +1,4 @@
-const GRAMMAR_FORGE_LIB_VERSION = '1.0.15';
+const GRAMMAR_FORGE_LIB_VERSION = '1.0.16';
 const BASE_URL = 'https://andro951.github.io/GrammarForge/';
 
 const files = [
