@@ -111,6 +111,7 @@ const ScriptForge = class ScriptForge {
             return;
         }
 
+        const script = this.registeredScripts.get(key);
         for (const triggerName of script.triggers) {
             const trigger = this.triggers.get(triggerName);
             if (!trigger)
