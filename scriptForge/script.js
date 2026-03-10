@@ -27,7 +27,7 @@ ScriptForge.Script = class Script {
         }
         else {
             if (this.fullAST === undefined) {
-                this.fullAST = this.sf.gf.partialAstBeingParsed;
+                this.fullAST = this.sf.gf.parser.partialAstBeingParsed;
                 try {
                     this.extractScriptFromText();
                 }
