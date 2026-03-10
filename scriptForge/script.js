@@ -44,8 +44,9 @@ ScriptForge.Script = class Script {
         this._enabled = value;
     }
     extractScriptFromText = () => {
+        const fullAST = this.fullAST;
         if (!fullAST)
-            throw new Error(`Script did not parse correctly:\n${scriptText}.`);
+            throw new Error(`Script did not parse correctly:\n${this.scriptText}.`);
 
         if (fullAST.length !== 2)
             throw new Error(`Script did not parse correctly for trigger ${this.key}.`);
