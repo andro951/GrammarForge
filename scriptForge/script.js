@@ -10,6 +10,7 @@ ScriptForge.Script = class Script {
         this.manuallyTriggered = false;
         this.ast = null;
         let successfullyParsed = false;
+        this.triggers = [];
         try {
             const scriptText = this.scriptText;
             const fullAST = this.sf.gf.parse(scriptText);
