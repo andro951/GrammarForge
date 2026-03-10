@@ -96,7 +96,7 @@ const ScriptForge = class ScriptForge {
 
             return action.canCallAction(args);
         } catch (e) {
-            const resume = this.onErrorDuringActionFunction ? this.onErrorDuringActionFunction(e, this, args, this.executingScript(), true) : false;
+            const resume = this.onErrorDuringActionFunction ? this.onErrorDuringActionFunction(e, action, args, this.executingScript(), true) : false;
             if (!resume)
                 throw e;
         }
