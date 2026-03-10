@@ -141,7 +141,7 @@ const ScriptForge = class ScriptForge {
         for (const triggerName of script.triggers) {
             if (triggerName === ScriptForge.Script.manualTriggerName)
                 continue;
-            
+
             const trigger = this.triggers.get(triggerName);
             if (!trigger) {
                 if (this.onParseScriptErrorFunction) {
@@ -160,5 +160,8 @@ const ScriptForge = class ScriptForge {
         for (const [key, script] of this.registeredScripts) {
             this.registerScriptWithItsTriggers(key, script);
         }
+    }
+    manuallyRunScript = (script) => {
+        this.gf.exec(script.ast, ScriptForge.ScriptTrigger.argsMap, this.allGettersFunctions);
     }
 }
