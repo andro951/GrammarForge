@@ -174,7 +174,7 @@ const ScriptForge = class ScriptForge {
         }
         catch (e) {
             if (this.onErrorInScriptFunction)
-                this.onErrorInScriptFunction(e, this, args, script);
+                this.onErrorInScriptFunction(e, null, null, script);
             
             script.enabled = false;
             script.error = e.toString();
