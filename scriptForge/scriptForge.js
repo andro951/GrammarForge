@@ -139,6 +139,9 @@ const ScriptForge = class ScriptForge {
     }
     registerScriptWithItsTriggers = (key, script) => {
         for (const triggerName of script.triggers) {
+            if (triggerName === ScriptForge.Script.manualTriggerName)
+                continue;
+            
             const trigger = this.triggers.get(triggerName);
             if (!trigger) {
                 if (this.onParseScriptErrorFunction) {

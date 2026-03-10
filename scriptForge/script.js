@@ -14,6 +14,7 @@ ScriptForge.Script = class Script {
             this.error = e;
         }
     }
+    static manualTriggerName = "Manual";
     get enabled() {
         return this._enabled && !this.error;
     }
@@ -207,6 +208,16 @@ ScriptForge.Script = class Script {
         this.triggers = triggers.split(/[,\s]+/).filter(Boolean);//Split by comma/whitespace and ignore empty entries
         if (this.triggers.length === 0)
             throw new Error(`Script has no triggers defined.`);
+        
+        if (this.triggers.includes(ScriptForge.Script.manualTriggerName)) {
+            if (this.triggers.length !== 1)
+                throw new Error(`Script uses the ${ScriptForge.Script.manualTriggerName} trigger. No other triggers are allowed when this trigger is used.`);
+
+            this.manuallyTriggered = true;
+        }
+        else {
+            this.manuallyTriggered = false;
+        }
         
         this.ast = ast;
         this.fullAST = fullAST;
