@@ -92,16 +92,16 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
                 continue;
             
             this.scriptForge.scriptCallStack.push(script);
-            //try {
+            try {
                 this.scriptForge.gf.exec(script.ast, ScriptForge.ScriptTrigger.argsMap, this.scriptForge.allGettersFunctions);
-            // }
-            // catch (e) {
-            //     if (this.scriptForge.onErrorInScriptFunction)
-            //         this.scriptForge.onErrorInScriptFunction(e, this, args, script);
+            }
+            catch (e) {
+                if (this.scriptForge.onErrorInScriptFunction)
+                    this.scriptForge.onErrorInScriptFunction(e, this, args, script);
                 
-            //     script.enabled = false;
-            //     script.error = e.toString();
-            // }
+                script.enabled = false;
+                script.error = e.toString();
+            }
 
             this.scriptForge.scriptCallStack.pop();
         }
