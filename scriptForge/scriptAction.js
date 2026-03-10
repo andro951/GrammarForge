@@ -43,7 +43,7 @@ ScriptForge.ScriptAction = class ScriptAction {
 
             this.action(args);
         } catch (e) {
-            const resume = this.onErrorDuringActionFunction ? this.onErrorDuringActionFunction(e, this, args, this.scriptForge.executingScript()) : false;
+            const resume = this.scriptForge.onErrorDuringActionFunction ? this.scriptForge.onErrorDuringActionFunction(e, this, args, this.scriptForge.executingScript()) : false;
             if (!resume)
                 throw e;
         }
