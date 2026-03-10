@@ -12,7 +12,7 @@ ScriptForge.Script = class Script {
         }
         catch (e) {
             this._enabled = false;
-            this.error = e;
+            this.error = e.toString();
         }
     }
     static manualTriggerName = "Manual";
