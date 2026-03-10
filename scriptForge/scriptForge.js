@@ -105,7 +105,7 @@ const ScriptForge = class ScriptForge {
             this.registerScriptWithItsTriggers(key, script);
 
         if (script.error && this.onParseScriptErrorFunction)
-            this.onParseScriptErrorFunction(script.error, key, script.scriptText);
+            this.onParseScriptErrorFunction(script.error, script);
         
         return script;
     }
