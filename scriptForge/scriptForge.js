@@ -7,7 +7,7 @@ const ScriptForge = class ScriptForge {
     //  Errors will automatically disable the script.
     
     //onErrorDuringActionFunction:
-    //  Parameters: (error, action, arguments, script)
+    //  Parameters: (error, action, arguments, script, isCheckingAvailability)
     //  Called when there is an error during execution of a script action.
     //  Return true if the error was handled.  Return false if the error was not handled, and the error should be thrown again to be caught by onErrorInScriptFunction.
     
@@ -87,7 +87,21 @@ const ScriptForge = class ScriptForge {
             throw new Error(`No script action found with name ${name}`);
         }
 
-        return action.canCallAction(args);
+        try {
+            if (action.parameters != null) {
+                if (args.length != action.canCallParameterCount) {
+                    throw new ScriptForge.ScriptAction.ScriptActionInvalidArgumentsError(`Error when trying to call ${action.name}?: Expected ${action.canCallParameterCount} arguments, but got ${args.length}.  arguments: ${args}`);
+                }
+            }
+
+            return action.canCallAction(args);
+        } catch (e) {
+            const resume = this.onErrorDuringActionFunction ? this.onErrorDuringActionFunction(e, this, args, this.executingScript(), true) : false;
+            if (!resume)
+                throw e;
+        }
+
+        return false;
     }
     registerScriptFromText = (key, scriptText, registerWithTriggers = false) => {
         const script = new ScriptForge.Script(key, scriptText, this);

@@ -1,12 +1,16 @@
 "use strict";
 
 ScriptForge.ScriptAction = class ScriptAction {
-    constructor(name, action, canCallAction, description, parameters = null) {
+    constructor(name, action, canCallAction, description, parameters = null, canCallParameterCount = null) {
         this.name = name;
         this.action = action;
         this.canCallAction = canCallAction;
         this.description = description;
         this.parameters = parameters;
+        if (this.parameters !== null && canCallParameterCount === null || this.parameters === null && canCallParameterCount !== null)
+            throw new Error(`Error when trying to create ScriptAction ${name}: If parameters is provided, canCallParameterCount must also be provided, and vice versa.`);
+        
+        this.canCallParameterCount = canCallParameterCount;
         this.scriptForge = null;//Set when registered to ScriptForge
         if (parameters != null) {
             for (let parameter of parameters) {
@@ -43,7 +47,7 @@ ScriptForge.ScriptAction = class ScriptAction {
 
             this.action(args);
         } catch (e) {
-            const resume = this.scriptForge.onErrorDuringActionFunction ? this.scriptForge.onErrorDuringActionFunction(e, this, args, this.scriptForge.executingScript()) : false;
+            const resume = this.scriptForge.onErrorDuringActionFunction ? this.scriptForge.onErrorDuringActionFunction(e, this, args, this.scriptForge.executingScript(), false) : false;
             if (!resume)
                 throw e;
         }
