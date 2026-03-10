@@ -117,6 +117,9 @@ const ScriptForge = class ScriptForge {
 
         const script = this.registeredScripts.get(key);
         for (const triggerName of script.triggers) {
+            if (triggerName === ScriptForge.Script.manualTriggerName)
+                continue;
+
             const trigger = this.triggers.get(triggerName);
             if (!trigger)
                 console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
@@ -162,6 +165,6 @@ const ScriptForge = class ScriptForge {
         }
     }
     manuallyRunScript = (script) => {
-        this.gf.exec(script.ast, ScriptForge.ScriptTrigger.argsMap, this.allGettersFunctions);
+        this.gf.exec(script.ast, null, this.allGettersFunctions);
     }
 }
