@@ -89,19 +89,23 @@ const ScriptForge = class ScriptForge {
 
         return action.canCallAction(args);
     }
-    registerScript = (key, scriptText, registerWithTriggers = false) => {
+    registerScriptFromText = (key, scriptText, registerWithTriggers = false) => {
+        const script = new ScriptForge.Script(key, scriptText);
+        return this.registerScript(script, registerWithTriggers);
+    }
+    registerScript = (script, registerWithTriggers = false) => {
+        const key = script.key;
         if (this.registeredScripts.has(key)) {
             console.error(`A script with the key "${key}" is already registered.`);
             return null;
         }
-
-        const script = new ScriptForge.Script(key, scriptText);
+        
         this.registeredScripts.set(key, script);
         if (script.enabled && registerWithTriggers)
             this.registerScriptWithItsTriggers(key, script);
 
         if (script.error && this.onParseScriptErrorFunction)
-            this.onParseScriptErrorFunction(script.error, key, scriptText);
+            this.onParseScriptErrorFunction(script.error, key, script.scriptText);
         
         return script;
     }
