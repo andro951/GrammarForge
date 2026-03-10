@@ -1,18 +1,39 @@
 "use strict";
 
 ScriptForge.Script = class Script {
-    constructor(key, scriptText) {
+    constructor(key, scriptText, scriptForge) {
         this.key = key;
         this.scriptText = scriptText;
+        this.sf = scriptForge;
         this._enabled = true;
         this.error = null;
         this.manuallyTriggered = false;
+        this.ast = null;
+        let successfullyParsed = false;
         try {
-            this.extractScriptFromText();
+            const scriptText = this.scriptText;
+            const fullAST = this.sf.gf.parse(scriptText);
+            this.fullAST = fullAST ?? null;
+            successfullyParsed = true;
         }
         catch (e) {
             this._enabled = false;
             this.error = e.toString();
+        }
+
+        if (successfullyParsed) {
+            this.extractScriptFromText();
+        }
+        else {
+            if (this.fullAST === undefined) {
+                this.fullAST = this.sf.gf.partialAstBeingParsed;
+                try {
+                    this.extractScriptFromText();
+                }
+                catch {
+                    
+                }
+            }
         }
     }
     static manualTriggerName = "Manual";
@@ -23,8 +44,6 @@ ScriptForge.Script = class Script {
         this._enabled = value;
     }
     extractScriptFromText = () => {
-        const scriptText = this.scriptText;
-        const fullAST = ZonScript.gf.parse(scriptText);
         if (!fullAST)
             throw new Error(`Script did not parse correctly:\n${scriptText}.`);
 
@@ -64,17 +83,6 @@ ScriptForge.Script = class Script {
 
         if (metaDataNodeTermType !== 'IDENTIFIER')
             throw new Error(`Script EXP TERM did not parse to an IDENTIFIER node for trigger ${this.key}, got ${metaDataNodeTermType} instead.`);
-
-        const [ astTermType, ast, astNodeTermType ] = astTermNode;
-        if (astTermType !== 'TERM')
-            throw new Error(`Script EXP did not parse to a TERM node for trigger ${this.key}, got ${astTermType} instead.`);
-
-        if (astNodeTermType !== 'IDENTIFIER')
-            throw new Error(`Script EXP TERM did not parse to an IDENTIFIER node for trigger ${this.key}, got ${astNodeTermType} instead.`);
-
-        const [stmtListNodeType, astInner, astExpressionNode] = ast;
-        if (stmtListNodeType !== 'stmt_list')
-            throw new Error(`Script AST did not parse to a stmt_list node for trigger ${this.key}, got ${stmtListNodeType} instead.`);
 
         const [metaDataNodeType, metaDataRuleNode] = metaDataNode;
         if (metaDataNodeType !== 'meta_data')
@@ -216,9 +224,19 @@ ScriptForge.Script = class Script {
 
             this.manuallyTriggered = true;
         }
-        
+
+        const [ astTermType, ast, astNodeTermType ] = astTermNode;
         this.ast = ast;
-        this.fullAST = fullAST;
+        
+        if (astTermType !== 'TERM')
+            throw new Error(`Script EXP did not parse to a TERM node for trigger ${this.key}, got ${astTermType} instead.`);
+
+        if (astNodeTermType !== 'IDENTIFIER')
+            throw new Error(`Script EXP TERM did not parse to an IDENTIFIER node for trigger ${this.key}, got ${astNodeTermType} instead.`);
+
+        const [stmtListNodeType, astInner, astExpressionNode] = ast;
+        if (stmtListNodeType !== 'stmt_list')
+            throw new Error(`Script AST did not parse to a stmt_list node for trigger ${this.key}, got ${stmtListNodeType} instead.`);
     }
 }
 

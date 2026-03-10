@@ -90,7 +90,7 @@ const ScriptForge = class ScriptForge {
         return action.canCallAction(args);
     }
     registerScriptFromText = (key, scriptText, registerWithTriggers = false) => {
-        const script = new ScriptForge.Script(key, scriptText);
+        const script = new ScriptForge.Script(key, scriptText, this);
         return this.registerScript(script, registerWithTriggers);
     }
     registerScript = (script, registerWithTriggers = false) => {

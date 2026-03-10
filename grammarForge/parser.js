@@ -7,6 +7,7 @@
             this.lexer = lexer;
             this.tokens = [];
             this.parseTokenFunctions = new Map();
+            this.partialAstBeingParsed = null;
             this.populateParseTokenFunctions();
             this.checkDuplicateRuleNames();
             this.tokenTags = new Map();
@@ -146,16 +147,22 @@
         }
 
         parse = (str) => {
+            this.partialAstBeingParsed = null;
+
             this.tokens = this.lexer.tokenize(str);
             return this.parseTokens(this.tokens);
         }
 
         parseTokens = (tokens) => {
+            this.partialAstBeingParsed = null;
+
             this.tokens = tokens;
             this.tokenStream = new GrammarForge.TokenStream(this.tokens);
             const ast = this.ruleFunctions[0](this.tokenStream);
-            if (!this.tokenStream.end())
+            if (!this.tokenStream.end()) {
+                this.partialAstBeingParsed = ast;
                 throw new Error("Unexpected tokens at end of input.");
+            }
             
             return ast;
         }
