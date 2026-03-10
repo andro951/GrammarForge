@@ -165,6 +165,21 @@ const ScriptForge = class ScriptForge {
         }
     }
     manuallyRunScript = (script) => {
-        this.gf.exec(script.ast, null, this.allGettersFunctions);
+        if (!script.enabled)
+            return;
+        
+        this.scriptCallStack.push(script);
+        try {
+            this.gf.exec(script.ast, null, this.allGettersFunctions);
+        }
+        catch (e) {
+            if (this.onErrorInScriptFunction)
+                this.onErrorInScriptFunction(e, this, args, script);
+            
+            script.enabled = false;
+            script.error = e.toString();
+        }
+
+        this.scriptCallStack.pop();
     }
 }
