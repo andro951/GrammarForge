@@ -89,8 +89,9 @@ const ScriptForge = class ScriptForge {
 
         try {
             if (action.parameters != null) {
+                const requiredArgsCount = action.requiredCanUseArgsCount;
                 if (args.length != action.canCallParameterCount) {
-                    throw new ScriptForge.ScriptAction.ScriptActionInvalidArgumentsError(`Error when trying to call ${action.name}?: Expected ${action.canCallParameterCount} arguments, but got ${args.length}.  arguments: ${args}`);
+                    throw new ScriptForge.ScriptAction.ScriptActionInvalidArgumentsError(`Error when trying to call ${action.name}?: Expected ${action.canCallParameterCount !== requiredArgsCount ? `${requiredArgsCount} to ${action.canCallParameterCount}` : action.canCallParameterCount} arguments, but got ${args.length}.  arguments: ${args}`);
                 }
             }
 

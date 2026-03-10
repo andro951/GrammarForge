@@ -12,10 +12,18 @@ ScriptForge.ScriptAction = class ScriptAction {
         
         this.canCallParameterCount = canCallParameterCount;
         this.scriptForge = null;//Set when registered to ScriptForge
+        let foundOptional = false;
         if (parameters != null) {
             for (let parameter of parameters) {
                 if (!(parameter instanceof ScriptForge.ScriptActionParameter)) {
                     throw new Error(`Error when trying to create ScriptAction ${name}: All parameters must be instances of ScriptActionParameter. Invalid parameter: ${parameter}`);
+                }
+
+                if (parameter.optional) {
+                    foundOptional = true;
+                }
+                else if (foundOptional) {
+                    throw new Error(`Error when trying to create ScriptAction ${name}: Required parameters cannot come after optional parameters.  Invalid parameter: ${parameter}`);
                 }
             }
         }
@@ -34,11 +42,40 @@ ScriptForge.ScriptAction = class ScriptAction {
             }
         }
     }
+    get requiredArgsCount() {
+        if (this.parameters == null)
+            return 0;
+
+        let count = 0;
+        for (let parameter of this.parameters) {
+            if (parameter.optional)
+                break;
+            
+            count++;
+        }
+
+        return count;
+    }
+    get requiredCanUseArgsCount() {
+        if (this.parameters == null)
+            return 0;
+
+        let count = 0;
+        for (let i = 0; i < this.canCallParameterCount; i++) {
+            if (this.parameters[i].optional)
+                break;
+
+            count++;
+        }
+
+        return count;
+    }
     run = (args) => {
         try {
             if (this.parameters != null) {
-                if (args.length != this.parameters.length) {
-                    throw new ScriptForge.ScriptAction.ScriptActionInvalidArgumentsError(`Error when trying to call ${this.name}: Expected ${this.parameters.length} arguments, but got ${args.length}.  arguments: ${args}`);
+                const requiredArgsCount = this.requiredArgsCount;
+                if (args.length > this.parameters.length || args.length < requiredArgsCount) {
+                    throw new ScriptForge.ScriptAction.ScriptActionInvalidArgumentsError(`Error when trying to call ${this.name}: Expected ${this.parameters.length != requiredArgsCount ? `${requiredArgsCount} to ${this.parameters.length}` : this.parameters.length} arguments, but got ${args.length}.  arguments: ${args}`);
                 }
             }
 
