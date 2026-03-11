@@ -146,10 +146,8 @@ const ScriptForge = class ScriptForge {
                 continue;
 
             const trigger = this.triggers.get(triggerName);
-            if (!trigger)
-                console.warn(`"${triggerName}" is not a valid trigger name.  Found in script:\n${script.scriptText}\n`);
-
-            trigger.unregisterScript(key);
+            if (trigger)
+                trigger.unregisterScript(key);
         }
 
         this.registeredScripts.delete(key);
