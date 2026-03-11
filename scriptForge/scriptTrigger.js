@@ -92,15 +92,25 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
                 continue;
             
             this.scriptForge.scriptCallStack.push(script);
-            try {
+
+            const tryFunc = () => {
                 this.scriptForge.gf.exec(script.ast, ScriptForge.ScriptTrigger.argsMap, this.scriptForge.allGettersFunctions);
             }
-            catch (e) {
-                if (this.scriptForge.onErrorInScriptFunction)
-                    this.scriptForge.onErrorInScriptFunction(e, this, args, script);
-                
-                script.enabled = false;
-                script.error = e.toString();
+
+            if (this.scriptForge.disableTryCatch) {
+                tryFunc();
+            }
+            else {
+                try {
+                    tryFunc();
+                }
+                catch (e) {
+                    if (this.scriptForge.onErrorInScriptFunction)
+                        this.scriptForge.onErrorInScriptFunction(e, this, args, script);
+                    
+                    script.enabled = false;
+                    script.error = e.toString();
+                }
             }
 
             this.scriptForge.scriptCallStack.pop();

@@ -11,28 +11,39 @@ ScriptForge.Script = class Script {
         this.ast = null;
         let successfullyParsed = false;
         this.triggers = [];
-        try {
+
+        const tryFunc = () => {
             const scriptText = this.scriptText;
             const fullAST = this.sf.gf.parse(scriptText);
             this.fullAST = fullAST ?? null;
-            successfullyParsed = true;
-        }
-        catch (e) {
-            this._enabled = false;
-            this.error = e.toString();
         }
 
-        if (successfullyParsed) {
+        if (this.sf.disableTryCatch) {
+            tryFunc();
             this.extractScriptFromText();
         }
         else {
-            if (this.fullAST === undefined) {
-                this.fullAST = this.sf.gf.parser.partialAstBeingParsed;
-                try {
-                    this.extractScriptFromText();
-                }
-                catch {
-                    
+            try {
+                tryFunc();
+                successfullyParsed = true;
+            }
+            catch (e) {
+                this._enabled = false;
+                this.error = e.toString();
+            }
+
+            if (successfullyParsed) {
+                this.extractScriptFromText();
+            }
+            else {
+                if (this.fullAST === undefined) {
+                    this.fullAST = this.sf.gf.parser.partialAstBeingParsed;
+                    try {
+                        this.extractScriptFromText();
+                    }
+                    catch {
+                        
+                    }
                 }
             }
         }

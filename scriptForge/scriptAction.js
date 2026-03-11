@@ -71,7 +71,7 @@ ScriptForge.ScriptAction = class ScriptAction {
         return count;
     }
     run = (args) => {
-        try {
+        const tryFunc = () => {
             if (this.parameters != null) {
                 const requiredArgsCount = this.requiredArgsCount;
                 if (args.length > this.parameters.length || args.length < requiredArgsCount) {
@@ -83,10 +83,19 @@ ScriptForge.ScriptAction = class ScriptAction {
                 return;
 
             this.action(args);
-        } catch (e) {
-            const resume = this.scriptForge.onErrorDuringActionFunction ? this.scriptForge.onErrorDuringActionFunction(e, this, args, this.scriptForge.executingScript(), false) : false;
-            if (!resume)
-                throw e;
+        };
+
+        if (this.scriptForge.disableTryCatch) {
+            tryFunc();
+        }
+        else {
+            try {
+                tryFunc();
+            } catch (e) {
+                const resume = this.scriptForge.onErrorDuringActionFunction ? this.scriptForge.onErrorDuringActionFunction(e, this, args, this.scriptForge.executingScript(), false) : false;
+                if (!resume)
+                    throw e;
+            }
         }
     }
 }

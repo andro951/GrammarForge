@@ -15,7 +15,7 @@ const ScriptForge = class ScriptForge {
     //  Parameters: (error, key, scriptText)
     //  Called when there is an error parsing a script.
     //  The script will not be registered if there is a parse error.
-    constructor(grammarForge, { onErrorInScriptFunction = null, onErrorDuringActionFunction = null, onParseScriptErrorFunction = null }) {
+    constructor(grammarForge, { onErrorInScriptFunction = null, onErrorDuringActionFunction = null, onParseScriptErrorFunction = null, disableTryCatch = false }) {
         if (!(grammarForge instanceof GrammarForge))
             throw new Error('grammarForge must be an instance of GrammarForge');
             
@@ -42,6 +42,7 @@ const ScriptForge = class ScriptForge {
         this.allGettersFunctions = new Map();
         this.triggers = new Map();
         this.scriptCallStack = [];
+        this.disableTryCatch = disableTryCatch;
     }
     executingScript = () => {
         return this.scriptCallStack[this.scriptCallStack.length - 1];
@@ -87,7 +88,7 @@ const ScriptForge = class ScriptForge {
             throw new Error(`No script action found with name ${name}`);
         }
 
-        try {
+        const tryFunc = () => {
             if (action.parameters != null) {
                 const requiredArgsCount = action.requiredCanUseArgsCount;
                 if (args.length != action.canCallParameterCount) {
@@ -96,10 +97,19 @@ const ScriptForge = class ScriptForge {
             }
 
             return action.canCallAction(args);
-        } catch (e) {
-            const resume = this.onErrorDuringActionFunction ? this.onErrorDuringActionFunction(e, action, args, this.executingScript(), true) : false;
-            if (!resume)
-                throw e;
+        }
+
+        if (this.disableTryCatch) {
+            return tryFunc();
+        }
+        else {
+            try {
+                return tryFunc();
+            } catch (e) {
+                const resume = this.onErrorDuringActionFunction ? this.onErrorDuringActionFunction(e, action, args, this.executingScript(), true) : false;
+                if (!resume)
+                    throw e;
+            }
         }
 
         return false;
@@ -184,15 +194,25 @@ const ScriptForge = class ScriptForge {
             return;
         
         this.scriptCallStack.push(script);
-        try {
+
+        const tryFunc = () => {
             this.gf.exec(script.ast, null, this.allGettersFunctions);
         }
-        catch (e) {
-            if (this.onErrorInScriptFunction)
-                this.onErrorInScriptFunction(e, null, null, script);
-            
-            script.enabled = false;
-            script.error = e.toString();
+
+        if (this.disableTryCatch) {
+            tryFunc();
+        }
+        else {
+            try {
+                tryFunc();
+            }
+            catch (e) {
+                if (this.onErrorInScriptFunction)
+                    this.onErrorInScriptFunction(e, null, null, script);
+                
+                script.enabled = false;
+                script.error = e.toString();
+            }
         }
 
         this.scriptCallStack.pop();
