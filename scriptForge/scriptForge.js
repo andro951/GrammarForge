@@ -273,7 +273,6 @@ const ScriptForge = class ScriptForge {
                 tryFunc();
             }
             catch (e) {
-                endTime = performance.now();
                 if (this.onErrorInScriptFunction)
                     this.onErrorInScriptFunction(e, trigger, args, script);
                 
