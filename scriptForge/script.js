@@ -218,6 +218,9 @@ ScriptForge.Script = class Script {
                 if (labelIndex !== undefined) {
                     foundArr[labelIndex] = content;
                 }
+                else {
+                    throw new Error(`Unknown MetaData label: ${match[1]}.  The only valid MetaData labels are: ${ScriptForge.Script.metaLabels.join(', ')}.`);
+                }
             }
         }
         
