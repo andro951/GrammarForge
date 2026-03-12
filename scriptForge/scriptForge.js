@@ -15,7 +15,7 @@ const ScriptForge = class ScriptForge {
     //  Parameters: (error, key, scriptText)
     //  Called when there is an error parsing a script.
     //  The script will not be registered if there is a parse error.
-    constructor(grammarForge, { onErrorInScriptFunction = null, onErrorDuringActionFunction = null, onParseScriptErrorFunction = null, disableTryCatch = false }) {
+    constructor(grammarForge, { onErrorInScriptFunction = null, onErrorDuringActionFunction = null, onParseScriptErrorFunction = null, disableTryCatch = false, logExecutionTime = false }) {
         if (!(grammarForge instanceof GrammarForge))
             throw new Error('grammarForge must be an instance of GrammarForge');
             
@@ -46,6 +46,7 @@ const ScriptForge = class ScriptForge {
         this.maxCallStackSize = 100;
         this.exceededMaxCallStackSize = false;
         this.disableTryCatch = disableTryCatch;
+        this.logExecutionTime = logExecutionTime;
     }
     executingScript = () => {
         return this.scriptCallStack[this.scriptCallStack.length - 1];
@@ -246,7 +247,16 @@ const ScriptForge = class ScriptForge {
         this.scriptCallStack.push(script);
 
         const tryFunc = () => {
+            const startTime = performance.now();
             this.gf.exec(script.ast, argsMap, this.allGettersFunctions);
+            const endTime = performance.now();
+            const executionTime = endTime - startTime;
+            if (this.logExecutionTime) {
+                console.log(`Script ${script.key} executed in ${executionTime}ms.`);
+            }
+
+            if (executionTime > script.maxExecutionTime)
+                throw new Error(`Script ${script.key} took ${executionTime}ms to execute, which exceeds the maximum execution time of ${script.maxExecutionTime}ms.`);
         }
 
         if (this.disableTryCatch) {
@@ -257,6 +267,7 @@ const ScriptForge = class ScriptForge {
                 tryFunc();
             }
             catch (e) {
+                endTime = performance.now();
                 if (this.onErrorInScriptFunction)
                     this.onErrorInScriptFunction(e, trigger, args, script);
                 

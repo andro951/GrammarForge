@@ -11,6 +11,7 @@ ScriptForge.Script = class Script {
         this.ast = null;
         let successfullyParsed = false;
         this.triggers = [];
+        this.maxExecutionTime = ScriptForge.Script.defaultMaxExecutionTime;
 
         const tryFunc = () => {
             const scriptText = this.scriptText;
@@ -49,6 +50,8 @@ ScriptForge.Script = class Script {
         }
     }
     static manualTriggerName = "Manual";
+    static defaultMaxExecutionTime = 10;//In milliseconds, 1/100th of a second
+    static maxMaxExecutionTime = 10000;//10 seconds, scripts that try to set MaxExecutionTime higher than this will throw an error, as that could cause significant lag.
     get enabled() {
         return this._enabled && !this.error;
     }
@@ -218,12 +221,20 @@ ScriptForge.Script = class Script {
             }
         }
         
-        const [scriptTitle, scriptDescription, scriptAuthor, scriptVersion, triggers] = foundArr;
+        const [scriptTitle, scriptDescription, scriptAuthor, scriptVersion, triggers, maxExecutionTime] = foundArr;
 
         this.title = scriptTitle;
         this.description = scriptDescription;
         this.author = scriptAuthor;
         this.version = scriptVersion;
+        if (maxExecutionTime) {
+            const maxExecutionTime = parseFloat(maxExecutionTime);
+            if (isNaN(maxExecutionTime) || maxExecutionTime <= 0)
+                throw new Error(`Invalid MaxExecutionTime: ${maxExecutionTime}. MaxExecutionTime is the amount of time (in milliiseconds) that the script is allowed to run.  If a script takes longer than it's MaxExecutionTime to run, it will be automatically disabled.  Increasing this past the default value of ${ScriptForge.Script.defaultMaxExecutionTime} could cause lag.  MaxExecutionTime must be a positive number less than ${ScriptForge.Script.maxMaxExecutionTime} (${ScriptForge.Script.maxMaxExecutionTime * 0.001} seconds).`);
+
+            this.maxExecutionTime = maxExecutionTime;
+        }
+
         if (!triggers)
             throw new Error(`Script is missing required Triggers meta data.`);
 
@@ -253,7 +264,7 @@ ScriptForge.Script = class Script {
     }
 }
 
-ScriptForge.Script.metaLabels = ["Title", "Description", "Author", "Version", "Triggers"];
+ScriptForge.Script.metaLabels = ["Title", "Description", "Author", "Version", "Triggers", "MaxExecutionTime"];
 ScriptForge.Script.metaLabelLookup = new Map();
 for (let i = 0; i < ScriptForge.Script.metaLabels.length; i++) {
     const label = ScriptForge.Script.metaLabels[i].toLowerCase();
