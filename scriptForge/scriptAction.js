@@ -7,6 +7,7 @@ ScriptForge.ScriptAction = class ScriptAction {
         this.canCallAction = canCallAction;
         this.description = description;
         this.parameters = parameters;
+        this.isDisallowedByAtLeastOneTrigger = false;
         if (this.parameters !== null && canCallParameterCount === null || this.parameters === null && canCallParameterCount !== null)
             throw new Error(`Error when trying to create ScriptAction ${name}: If parameters is provided, canCallParameterCount must also be provided, and vice versa.`);
         
@@ -71,6 +72,17 @@ ScriptForge.ScriptAction = class ScriptAction {
         return count;
     }
     run = (args) => {
+        if (this.isDisallowedByAtLeastOneTrigger) {
+            for (const triggerName of this.scriptForge.triggeredScriptsOnStack.keys()) {
+                const trigger = this.scriptForge.triggers.get(triggerName);
+                if (!trigger)
+                    throw new Error(`Failed to find trigger, ${triggerName}, even though it is on the stack.`);
+
+                if (trigger.disallowedActions.has(this.name))
+                    throw new Error(`Attempted to call ${this.name} during trigger, ${triggerName}.  This would most likely cause an infinite loop.`);
+            }
+        }
+
         const tryFunc = () => {
             if (this.parameters != null) {
                 const requiredArgsCount = this.requiredArgsCount;

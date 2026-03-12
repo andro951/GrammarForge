@@ -9,9 +9,8 @@ ScriptForge.ScriptParameter = class ScriptParameter {
 }
 
 ScriptForge.ScriptTrigger = class ScriptTrigger {
-    constructor(name, description, parameters, scriptForge) {
+    constructor(name, description, parameters, disallowedActions, scriptForge) {
         this.name = name;
-        //throw if name not string
         if (typeof name !== 'string')
             throw new Error('Trigger name must be a string');
             
@@ -22,6 +21,13 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
         this.parameters = parameters;
         if (!Array.isArray(parameters) || !parameters.every(p => p instanceof ScriptForge.ScriptParameter))
             throw new Error('Trigger parameters must be an array of ScriptParameter instances');
+
+        if (disallowedActions === null)
+            disallowedActions = new Set();
+
+        this.disallowedActions = disallowedActions;
+        if (!(disallowedActions instanceof Set))
+            throw new Error('Trigger disallowedActions must be a Set or null.');
 
         this.scriptForge = scriptForge;
         if (!(scriptForge instanceof ScriptForge))
@@ -35,7 +41,6 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
     unregisterScript = (key) => {
         this.registeredScripts.delete(key);
     }
-    static argsMap = new Map();
     static isSimpleType = (value) => {
         return (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean');
     }
@@ -54,7 +59,7 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
         if (!anyEnabled)
             return;
         
-        ScriptForge.ScriptTrigger.argsMap.clear();
+        const argsMap = new Map();
 
         if (args !== null) {
             if (typeof args !== 'function')
@@ -72,7 +77,7 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
                     throw new Error(`Value for key ${key} cannot be null or undefined`);
 
                 if (ScriptForge.ScriptTrigger.isSimpleType(value)) {
-                    ScriptForge.ScriptTrigger.argsMap.set(key, value);
+                    argsMap.set(key, value);
                 }
                 else {
                     const clonedValue = value.clone;
@@ -82,38 +87,13 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
                     if (clonedValue === value)
                         throw new Error(`Value for key ${key} clone getter must return a different instance`);
 
-                    ScriptForge.ScriptTrigger.argsMap.set(key, clonedValue);
+                    argsMap.set(key, clonedValue);
                 }
             }
         }
         
         for (const [key, script] of this.registeredScripts) {
-            if (!script.enabled)
-                continue;
-            
-            this.scriptForge.scriptCallStack.push(script);
-
-            const tryFunc = () => {
-                this.scriptForge.gf.exec(script.ast, ScriptForge.ScriptTrigger.argsMap, this.scriptForge.allGettersFunctions);
-            }
-
-            if (this.scriptForge.disableTryCatch) {
-                tryFunc();
-            }
-            else {
-                try {
-                    tryFunc();
-                }
-                catch (e) {
-                    if (this.scriptForge.onErrorInScriptFunction)
-                        this.scriptForge.onErrorInScriptFunction(e, this, args, script);
-                    
-                    script.enabled = false;
-                    script.error = e.toString();
-                }
-            }
-
-            this.scriptForge.scriptCallStack.pop();
+            this.scriptForge._runScript(script, this.name, this, args, argsMap);
         }
     }
 }

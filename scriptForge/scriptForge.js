@@ -42,6 +42,9 @@ const ScriptForge = class ScriptForge {
         this.allGettersFunctions = new Map();
         this.triggers = new Map();
         this.scriptCallStack = [];
+        this.triggeredScriptsOnStack = new Map();
+        this.maxCallStackSize = 100;
+        this.exceededMaxCallStackSize = false;
         this.disableTryCatch = disableTryCatch;
     }
     executingScript = () => {
@@ -59,19 +62,33 @@ const ScriptForge = class ScriptForge {
 
         this.scriptActions.set(scriptAction.name, scriptAction);
         scriptAction.scriptForge = this;
+        for (const trigger of this.triggers) {
+            if (trigger.disallowedActions.has(scriptAction.name)) {
+                scriptAction.isDisallowedByAtLeastOneTrigger = true;
+                break;
+            }
+        }
     }
 
     defineScriptAction = (...args) => {
         const scriptAction = new ScriptForge.ScriptAction(...args);
         this.addScriptAction(scriptAction);
     }
-    defineTrigger = (name, description, parameters) => {
-        const trigger = new ScriptForge.ScriptTrigger(name, description, parameters, this);
+    defineTrigger = (name, description, parameters, disallowedActions = null) => {
+        const trigger = new ScriptForge.ScriptTrigger(name, description, parameters, disallowedActions, this);
         if (this.triggers.has(name)) {
             throw new Error(`Trigger with name ${name} already exists`);
         }
 
         this.triggers.set(name, trigger);
+        for (const action of this.scriptActions) {
+            if (action.isDisallowedByAtLeastOneTrigger)
+                continue;
+
+            if (trigger.disallowedActions.has(action.name))
+                action.isDisallowedByAtLeastOneTrigger = true;
+        }
+
         return trigger;
     }
     runScriptAction = (name, args) => {
@@ -187,14 +204,49 @@ const ScriptForge = class ScriptForge {
             this.registerScriptWithItsTriggers(key, script);
         }
     }
-    manuallyRunScript = (script) => {
+    _runScript = (script, triggerName, trigger, args, argsMap) => {
         if (!script.enabled)
             return;
-        
+
+        if (this.scriptCallStack.length >= this.maxCallStackSize) {
+            this.exceededMaxCallStackSize = true;
+        }
+
+        if (this.exceededMaxCallStackSize) {
+            //Prevent scripts from starting if max call stack size was exceeded.
+            const error = new Error(`Maximum call stack size of ${this.maxCallStackSize} exceeded.  ${script.key} was not run.  All scripts on the call stack will be disabled.`);
+            if (this.onErrorInScriptFunction)
+                this.onErrorInScriptFunction(error, trigger, args, script);
+
+            script._enabled = false;
+            script.error = error.toString();
+
+            //Stop the current script from running by throwing an error.
+            if (this.scriptCallStack.length == this.maxCallStackSize)
+                throw new Error(`Exceeded max call stack size.  Current call stack size: ${this.scriptCallStack.length}`);
+
+            return;
+        }
+
+        if (this.triggeredScriptsOnStack.has(triggerName)) {
+            const set = this.triggeredScriptsOnStack.get(triggerName);
+            if (set.has(script)) {
+                const error = new Error(`Script ${script.key} is already on the call stack for trigger ${triggerName}.  This is not allowed to prevent infinite loops.`);
+                script._enabled = false;
+                script.error = error.toString();
+                return;
+            }
+
+            set.add(script);
+        }
+        else {
+            this.triggeredScriptsOnStack.set(triggerName, new Set([script]));
+        }
+
         this.scriptCallStack.push(script);
 
         const tryFunc = () => {
-            this.gf.exec(script.ast, null, this.allGettersFunctions);
+            this.gf.exec(script.ast, argsMap, this.allGettersFunctions);
         }
 
         if (this.disableTryCatch) {
@@ -206,7 +258,7 @@ const ScriptForge = class ScriptForge {
             }
             catch (e) {
                 if (this.onErrorInScriptFunction)
-                    this.onErrorInScriptFunction(e, null, null, script);
+                    this.onErrorInScriptFunction(e, trigger, args, script);
                 
                 script.enabled = false;
                 script.error = e.toString();
@@ -214,5 +266,31 @@ const ScriptForge = class ScriptForge {
         }
 
         this.scriptCallStack.pop();
+        if (!this.triggeredScriptsOnStack.has(triggerName))
+            throw new Error(`No scripts found in triggeredScriptsOnStack for "${triggerName}"`);
+
+        const existingSet = this.triggeredScriptsOnStack.get(triggerName);
+        existingSet.delete(script);
+        if (existingSet.size === 0)
+            this.triggeredScriptsOnStack.delete(triggerName);
+
+        //If max call stack was exceeded, break all other scripts on the stack
+        if (this.exceededMaxCallStackSize) {
+            if (this.scriptCallStack.length === 0) {
+                this.exceededMaxCallStackSize = false;
+            }
+            else {
+                throw new Error(`Exceeded max call stack size.  Current call stack size: ${this.scriptCallStack.length}`);
+            }
+        }
+
+        //If A script is called when it already exists on the stack, it will just set it's error, 
+        // but it would still try to finish executing.  Instead, stop it by throwing an error.
+        const nextScriptOnStack = this.executingScript();
+        if (nextScriptOnStack && nextScriptOnStack.error !== null)
+            throw new Error(nextScriptOnStack.error);
+    }
+    manuallyRunScript = (script) => {
+        this._runScript(script, ScriptForge.Script.manualTriggerName, null, null, null);
     }
 }
