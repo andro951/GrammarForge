@@ -238,11 +238,11 @@ ScriptForge.Script = class Script {
         this.author = scriptAuthor;
         this.version = scriptVersion;
         if (maxExecutionTime) {
-            const maxExecutionTime = parseFloat(maxExecutionTime);
-            if (isNaN(maxExecutionTime) || maxExecutionTime <= 0)
-                throw new Error(`Invalid MaxExecutionTime: ${maxExecutionTime}. MaxExecutionTime is the amount of time (in milliiseconds) that the script is allowed to run.  If a script takes longer than it's MaxExecutionTime to run, it will be automatically disabled.  Increasing this past the default value of ${ScriptForge.Script.defaultMaxExecutionTime} could cause lag.  MaxExecutionTime must be a positive number less than ${ScriptForge.Script.maxMaxExecutionTime} (${ScriptForge.Script.maxMaxExecutionTime * 0.001} seconds).`);
+            const maxExecutionTimeFloat = parseFloat(maxExecutionTime);
+            if (isNaN(maxExecutionTimeFloat) || maxExecutionTimeFloat <= 0)
+                throw new Error(`Invalid MaxExecutionTime: ${maxExecutionTimeFloat}. MaxExecutionTime is the amount of time (in milliiseconds) that the script is allowed to run.  If a script takes longer than it's MaxExecutionTime to run, it will be automatically disabled.  Increasing this past the default value of ${ScriptForge.Script.defaultMaxExecutionTime} could cause lag.  MaxExecutionTime must be a positive number less than ${ScriptForge.Script.maxMaxExecutionTime} (${ScriptForge.Script.maxMaxExecutionTime * 0.001} seconds).`);
 
-            this.maxExecutionTime = maxExecutionTime;
+            this.maxExecutionTime = maxExecutionTimeFloat;
         }
 
         if (!triggers)
