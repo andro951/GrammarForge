@@ -143,6 +143,7 @@ ScriptForge.Script = class Script {
             throw new Error(`Script meta_data EXP QWORD did not parse to a QUESTION node for trigger ${this.key}, got ${metaDataQWordOType} instead.`);
 
         const foundArr = new Array(ScriptForge.Script.metaLabels.length).fill(null);
+        let unrecognizedMetaDataLabels = [];
         if (metaDataQWordNode !== null) {
             const [expListNodeType, expListNode, expressionNode] = metaDataQWordNode;
             if (expListNodeType !== 'EXPLIST')
@@ -197,7 +198,6 @@ ScriptForge.Script = class Script {
             if (metaDataQWordOType !== 'STAR')
                 throw new Error(`Script meta_data QWORD EXP QWORD did not parse to a STAR node for trigger ${this.key}, got ${metaDataQWordOType} instead.`);
 
-            let unrecognizedMetaDataLabels = [];
             for (const [metaDataTermNodeLabel, metaDataTermNodeValue, metaDataTermNodeType] of metaDataQWordNodeValue) {
                 if (metaDataTermNodeLabel !== 'TERM')
                     throw new Error(`Script meta_data QWORD EXP QWORD did not parse to a TERM node for trigger ${this.key}, got ${metaDataTermNodeLabel} instead.`);
