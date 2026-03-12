@@ -181,6 +181,12 @@ const ScriptForge = class ScriptForge {
             this.name = "BadTriggerNameError";
         }
     }
+    static BadMetaDataLabelError = class BadMetaDataLabelError extends Error {
+        constructor(message) {
+            super(message);
+            this.name = "BadMetaDataLabelError";
+        }
+    }
     registerScriptWithItsTriggers = (key, script) => {
         for (const triggerName of script.triggers) {
             if (triggerName === ScriptForge.Script.manualTriggerName)

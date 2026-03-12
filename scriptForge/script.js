@@ -197,6 +197,7 @@ ScriptForge.Script = class Script {
             if (metaDataQWordOType !== 'STAR')
                 throw new Error(`Script meta_data QWORD EXP QWORD did not parse to a STAR node for trigger ${this.key}, got ${metaDataQWordOType} instead.`);
 
+            let unrecognizedMetaDataLabels = [];
             for (const [metaDataTermNodeLabel, metaDataTermNodeValue, metaDataTermNodeType] of metaDataQWordNodeValue) {
                 if (metaDataTermNodeLabel !== 'TERM')
                     throw new Error(`Script meta_data QWORD EXP QWORD did not parse to a TERM node for trigger ${this.key}, got ${metaDataTermNodeLabel} instead.`);
@@ -225,7 +226,7 @@ ScriptForge.Script = class Script {
                     foundArr[labelIndex] = content;
                 }
                 else {
-                    throw new Error(`Unknown MetaData label: ${match[1]}.  The only valid MetaData labels are: ${ScriptForge.Script.metaLabels.join(', ')}.`);
+                    unrecognizedMetaDataLabels.push(match[1]);
                 }
             }
         }
@@ -270,6 +271,12 @@ ScriptForge.Script = class Script {
         const [stmtListNodeType, astInner, astExpressionNode] = ast;
         if (stmtListNodeType !== 'stmt_list')
             throw new Error(`Script AST did not parse to a stmt_list node for trigger ${this.key}, got ${stmtListNodeType} instead.`);
+
+        if (unrecognizedMetaDataLabels.length > 0) {
+            const error = new ScriptForge.BadMetaDataLabelError(`Unknown MetaData label${unrecognizedMetaDataLabels.length > 1 ? 's' : ''}: ${unrecognizedMetaDataLabels.join(', ')}.  The only valid MetaData labels are: ${ScriptForge.Script.metaLabels.join(', ')}.`);
+            if (this.sf.onParseScriptErrorFunction)
+                this.sf.onParseScriptErrorFunction(error, this);
+        }
     }
 }
 
