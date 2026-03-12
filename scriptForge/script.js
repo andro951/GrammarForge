@@ -23,8 +23,10 @@ ScriptForge.Script = class Script {
             this.extractScriptFromText();
         }
         else {
+            let successfullyParsed = false;
             try {
                 tryFunc();
+                successfullyParsed = true;
             }
             catch (e) {
                 this._enabled = false;
