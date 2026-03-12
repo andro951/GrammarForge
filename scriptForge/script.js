@@ -9,7 +9,6 @@ ScriptForge.Script = class Script {
         this.error = null;
         this.manuallyTriggered = false;
         this.ast = null;
-        let successfullyParsed = false;
         this.triggers = [];
         this.maxExecutionTime = ScriptForge.Script.defaultMaxExecutionTime;
 
@@ -26,7 +25,6 @@ ScriptForge.Script = class Script {
         else {
             try {
                 tryFunc();
-                successfullyParsed = true;
             }
             catch (e) {
                 this._enabled = false;
@@ -34,7 +32,13 @@ ScriptForge.Script = class Script {
             }
 
             if (successfullyParsed) {
-                this.extractScriptFromText();
+                try {
+                    this.extractScriptFromText();
+                }
+                catch (e) {
+                    this._enabled = false;
+                    this.error = e.toString();
+                }
             }
             else {
                 if (this.fullAST === undefined) {
