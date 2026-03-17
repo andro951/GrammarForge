@@ -110,6 +110,9 @@ ScriptForge.ScriptAction = class ScriptAction {
             }
         }
     }
+    toString() {
+        return `@${this.name}(${this.parameters ? this.parameters.map(p => p.name).join(", ") : ""})`;
+    }
 }
 
 ScriptForge.ScriptActionParameter = class ScriptActionParameter {
@@ -119,7 +122,7 @@ ScriptForge.ScriptActionParameter = class ScriptActionParameter {
         this.optional = optional;
     }
 
-    toString = () => {
+    toString() {
         return `${this.name}${this.optional ? " (optional)" : ""}: ${this.description}`;
     }
 }

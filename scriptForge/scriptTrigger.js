@@ -6,6 +6,9 @@ ScriptForge.ScriptParameter = class ScriptParameter {
         this.scriptName = scriptName;
         this.description = description;
     }
+    toString() {
+        return `${this.scriptName}: ${this.description}`;
+    }
 }
 
 ScriptForge.ScriptTrigger = class ScriptTrigger {
@@ -95,5 +98,8 @@ ScriptForge.ScriptTrigger = class ScriptTrigger {
         for (const [key, script] of this.registeredScripts) {
             this.scriptForge._runScript(script, this.name, this, args, argsMap);
         }
+    }
+    toString() {
+        return `${this.name} - variables: ${this.parameters ? this.parameters.map(p => p.scriptName).join(", ") : ""}`;
     }
 }
