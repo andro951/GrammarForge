@@ -262,7 +262,7 @@ const ScriptForge = class ScriptForge {
             }
 
             if (executionTime > script.maxExecutionTime)
-                throw new Error(`Script ${script.key} took ${executionTime}ms to execute, which exceeds the maximum execution time of ${script.maxExecutionTime}ms.`);
+                throw new Error(`Script ${script.key} took ${executionTime}ms to execute, which exceeds the maximum execution time of ${script.maxExecutionTime}ms. This can be increased by setting the MetaData tag, MaxExecutuinTime, but consider trying to make the script smaller or faster.`);
         }
 
         if (this.disableTryCatch) {

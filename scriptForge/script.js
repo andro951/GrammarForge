@@ -281,6 +281,15 @@ ScriptForge.Script = class Script {
 }
 
 ScriptForge.Script.metaLabels = ["Title", "Description", "Author", "Version", "Triggers", "MaxExecutionTime"];
+ScriptForge.Script.metaDescriptions = [
+    "The title of the script. (optional)",
+    "A description of the script. (optional)",
+    "The author of the script. (optional)",
+    "The version of the script. (optional)",
+    `A comma or whitespace separated list of triggers that will cause the script to run. (required)`,
+    `The maximum amount of time (in milliseconds) that the script is allowed to run before it is automatically disabled. (optional, default is ${ScriptForge.Script.defaultMaxExecutionTime}ms)`
+];
+
 ScriptForge.Script.metaLabelLookup = new Map();
 for (let i = 0; i < ScriptForge.Script.metaLabels.length; i++) {
     const label = ScriptForge.Script.metaLabels[i].toLowerCase();
