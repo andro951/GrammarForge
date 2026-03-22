@@ -17,14 +17,15 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
         this.qWordString = this.toString();
     }
 
-    computeLookaheadSetAndFreeze(parser) {
-        if (this.lookaheadSet)
-            return this.lookaheadSet;
-        
-        this.lookaheadSet = this.word.computeLookaheadSetAndFreeze(parser);
-        Object.freeze(this);
+    //Returns true if left recursion was checked and not found
+    //Throws an error if left recursion is found
+    //Returns false if this word was not a match, but is optional
+    checkWordForLeftRecursion = (parser, expr, lookAheadSet) => {
+        const checked = this.word.checkWordForLeftRecursion(parser, expr, lookAheadSet);
+        if (checked && this.oType === 'PLUS')
+            return true;
 
-        return this.lookaheadSet;
+        return false;
     }
 
     oTypeToString(oType) {
@@ -40,6 +41,34 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
         }
     }
 
+    _getResultQuestion = (result) => {
+        if (result === null)
+            result = new GrammarForge.EmptyNode();
+
+        if (GrammarForge.makeFullAST) {
+            return [ 'QWORD', result, this.oType ];
+        }
+        else {
+            return result;
+        }
+    }
+
+    _getResult = (result, parser) => {
+        if (GrammarForge.makeFullAST) {
+            return [ 'QWORD', result, this.oType ];
+        }
+        else if (result.length === 1) {
+            const stmt_rule = parser.exec.stmt_rule;
+            if (stmt_rule !== null) {
+                const expNode = result[0];
+                if (expNode instanceof GrammarForge.ExpNode && expNode.expression.rule === stmt_rule)
+                    return expNode;
+            }
+        }
+        
+        return result;
+    }
+
     getParseFunc = (parser) => {
         let funcIndex = parser.ruleSubFunctionLookup.get(this.qWordString);
         if (funcIndex === undefined) {
@@ -51,13 +80,14 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                             let result = null;
                             if (!tokenStream.end()) {
                                 const clonedStream = tokenStream.clone();
-                                result = wordTryParseFunc(clonedStream);
-                                if (result) {
+                                const tryResult = wordTryParseFunc(clonedStream);
+                                if (tryResult && clonedStream.index > tokenStream.index) {
                                     tokenStream.index = clonedStream.index;
+                                    result = tryResult;
                                 }
                             }
 
-                            return [ 'QWORD', result, this.oType ];
+                            return this._getResultQuestion(result);
                         }
                     }
                     break;
@@ -80,7 +110,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                                 }
                             }
 
-                            return [ 'QWORD', result, this.oType ];
+                            return this._getResult(result, parser);
                         }
                     }
                     break;
@@ -106,7 +136,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                                 }
                             }
 
-                            return [ 'QWORD', result, this.oType ];
+                            return this._getResult(result, parser);
                         }
                     }
                     break;
@@ -131,13 +161,14 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                         let result = null;
                         if (!tokenStream.end()) {
                             const clonedStream = tokenStream.clone();
-                            result = wordTryParseFunc(clonedStream);
-                            if (result) {
+                            const tryResult = wordTryParseFunc(clonedStream);
+                            if (tryResult && clonedStream.index > tokenStream.index) {
                                 tokenStream.index = clonedStream.index;
+                                result = tryResult;
                             }
                         }
 
-                        return [ 'QWORD', result, this.oType ];
+                        return this._getResultQuestion(result);
                     }
                     break;
                 case "STAR":
@@ -158,7 +189,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                             }
                         }
 
-                        return [ 'QWORD', result, this.oType ];
+                        return this._getResult(result, parser);
                     }
                     break;
                 case "PLUS":
@@ -185,7 +216,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                             }
                         }
 
-                        return [ 'QWORD', result, this.oType ];
+                        return this._getResult(result, parser);
                     }
                     break;
                 default:
@@ -198,87 +229,29 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    getCheckFunction = (exec) => {
-        switch (this.oType) {
-            case "QUESTION":
-                return (ast) => {
-                    if (ast === undefined)
-                        throw new Error(`getCheckFunction: QUESTION QWord AST node cannot be undefined.`);
-                }
-            case "STAR":
-                return (ast) => {
-                    exec.check_optional(ast);
-                }
-            case "PLUS":
-                return (ast) => {
-                    exec.check_required(ast);
-                }
-            default:
-                throw new Error(`getCheckFunction: Par type ${this.oType} not supported`);
-        }
+    setNonTerminalIndexs = (containsOptional) => {
+        const nonTerminalsCount = this.word.setNonTerminalIndexs(containsOptional);
+        if (nonTerminalsCount > 0 && containsOptional && this.oType === 'QUESTION')
+            return 1;
+        
+        return nonTerminalsCount;
     }
 
-    getBaseFunction = (exec) => {
-        const wordFunc = this.word.getBaseFunction(exec);
-        let func;
-        const thisOType = this.oType;
-        const checkFunc = this.getCheckFunction(exec);
-        switch (this.oType) {
-            case "QUESTION":
-                func = (ast) => {
-                    const [ qWordType, innerAST, oType ] = ast;
-                    if (qWordType !== 'QWORD')
-                        throw new Error(`Expected QWORD type in AST node, got ${qWordType}`);
+    getNonTerminalsFromIndexs = (containsOptional) => {
+        const nonTerminals = this.word.getNonTerminalsFromIndexs(containsOptional);
+        if (nonTerminals.length > 0 && containsOptional && this.oType === 'QUESTION')
+            return [ [ this, nonTerminals ] ];
 
-                    if (oType !== thisOType)
-                        throw new Error(`Expected ${thisOType} oType QUESTION in AST node, got ${oType}`);
-
-                    checkFunc(innerAST);
-                    
-                    if (innerAST === null)
-                        return null;
-
-                    return wordFunc(innerAST);
-                }
-                break;
-            case "STAR":
-            case "PLUS":
-                func = (ast) => {
-                    const [ qWordType, innerAST, oType ] = ast;
-                    if (qWordType !== 'QWORD')
-                        throw new Error(`Expected QWORD type in AST node, got ${qWordType}`);
-
-                    if (oType !== thisOType)
-                        throw new Error(`Expected ${thisOType} oType in AST node, got ${oType}`);
-
-                    checkFunc(innerAST);
-
-                    const results = [];
-                    for (let i = 0; i < innerAST.length; i++) {
-                        results.push(wordFunc(innerAST[i]));
-                    }
-
-                    return results;
-                }
-                break;
-            default:
-                throw new Error(`getExecFunction: Par type ${this.oType} not supported`);
-        }
-
-        return func;
-    }
-
-    tryGetNonTerminals = () => {
-        return this.word.tryGetNonTerminals();
-    }
-
-    hasNonTerminal = () => {
-        return this.word.hasNonTerminal();
+        return nonTerminals;
     }
 
     getChildren = (parser, childrenIndexSet) => {
         this.word.getChildren(parser, childrenIndexSet);
     }
+
+    // walk = function*() {
+    //     yield this;
+    // }
 
     toString() {
         return `${this.word.toString()}${this.oTypeToString(this.oType)}`;

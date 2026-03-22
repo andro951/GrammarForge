@@ -10,14 +10,21 @@ GrammarForge.Par = class Par extends GrammarForge.Word {
         this.parString = this.toString();
     }
 
-    computeLookaheadSetAndFreeze(parser) {
-        if (this.lookaheadSet)
-            return this.lookaheadSet;
-        
-        this.lookaheadSet = this.expList.computeLookaheadSetAndFreeze(parser);
-        Object.freeze(this);
+    //Returns true if left recursion was checked and not found
+    //Throws an error if left recursion is found
+    //Returns false if this word was not a match, but is optional
+    checkWordForLeftRecursion = (parser, expr, lookAheadSet) => {
+        let allChecked = true;
+        //Need to check all expressions inside the par in case they allow left recursion.
+        for (let i = 0; i < this.expList.expressions.length; i++) {
+            const expr = this.expList.expressions[i];
+            const checked = expr.checkWordsForLeftRecursion(parser, lookAheadSet);
+            if (!checked)
+                allChecked = false;
+        }
 
-        return this.lookaheadSet;
+        //If any of the expressions in the Par are completely optional, then the Par is optional, and shouldn't stop looking for left recursion.
+        return allChecked;
     }
 
     getParseFunc = (parser) => {
@@ -28,25 +35,21 @@ GrammarForge.Par = class Par extends GrammarForge.Word {
         return this.expList.getTryParseFunc(parser);
     }
 
-    getCheckFunction = (exec) => {
-        return this.expList.getCheckFunction(exec);
+    setNonTerminalIndexs = (containsOptional) => {
+        return this.expList.setNonTerminalIndexs(containsOptional);
     }
 
-    getBaseFunction = (exec) => {
-        return this.expList.getBaseFunction(exec);
-    }
-
-    tryGetNonTerminals = () => {
-        return this.expList.tryGetNonTerminals();
-    }
-
-    hasNonTerminal = () => {
-        return this.expList.hasNonTerminal();
+    getNonTerminalsFromIndexs = (containsOptional) => {
+        return this.expList.getNonTerminalsFromIndexs(containsOptional);
     }
 
     getChildren = (parser, childrenIndexSet) => {
         this.expList.getChildren(parser, childrenIndexSet);
     }
+
+    // walk = function*() {
+    //     yield* this.expList.walk();
+    // }
 
     toString() {
         return `(${this.expList.toString()})`;

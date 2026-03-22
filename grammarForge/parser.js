@@ -18,10 +18,8 @@
             this.createRuleMaps();
 
             for (const rule of this.rules) {
-                rule.computeLookaheadSetAndFreeze(this);
+                rule.checkLeftRecursion(this);
             }
-
-            Object.freeze(this.rules);
             
             this.createRuleParseFunctions();
         }
@@ -43,17 +41,7 @@
                 this.ruleIndexLookup.set(rule.name, i);
             }
 
-            this.expressionIndexLookup = [];//Array of maps<expressionString, expressionIndex>; expressionIndexLookup[ruleIndex].get(expressionString) => expressionIndex
-            for (let i = 0; i < this.rules.length; i++) {
-                this.expressionIndexLookup.push(new Map());
-                for (let j = 0; j < this.rules[i].expList.expressions.length; j++) {
-                    const expression = this.rules[i].expList.expressions[j];
-                    this.expressionIndexLookup[i].set(expression.expressionString, j);
-                }
-            }
-
             Object.freeze(this.ruleIndexLookup);
-            Object.freeze(this.expressionIndexLookup);
 
             this.ruleTagLookup = new Map();
             for (let i = 0; i < this.rules.length; i++) {
@@ -222,6 +210,8 @@
                 throw new Error(`No parse function found for token type ${token.type} with tag ${tag}`);
             
             const value = parseFunction(token);
+
+            return new GrammarForge.TokenNode(token.type, value);
             return ['TOKEN', token.type, value];
         }
 
@@ -234,6 +224,8 @@
                 throw new Error(`Expected symbol '${symbol}', found '${token.value}'`);
 
             tokenStream.match('SYMBOL');
+
+            return new GrammarForge.SymbolNode(symbol);
             return [`SYMBOL`, token.value];
         }
 
@@ -251,6 +243,7 @@
             if (!tokenStream.tryMatch('SYMBOL'))
                 return null;
 
+            return new GrammarForge.SymbolNode(symbol);
             return [`SYMBOL`, token.value];
         }
     }

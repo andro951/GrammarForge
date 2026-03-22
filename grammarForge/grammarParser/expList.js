@@ -11,25 +11,13 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
         this.subFuncString = this.expListString + `$EL`;
     }
 
-    computeLookaheadSetAndFreeze(parser) {
-        if (this.lookaheadSet)
-            return this.lookaheadSet;
-        
-        this.lookaheadSet = new Set();
-        for (const expr of this.expressions) {
-            const exprLookaheadSet = expr.computeLookaheadSetAndFreeze(parser);
-            if (!exprLookaheadSet)
-                throw new Error("Expression in ExpList has no lookahead set.");
-
-            for (const tokenType of exprLookaheadSet) {
-                this.lookaheadSet.add(tokenType);
-            }
+    _getResult = (result) => {
+        if (GrammarForge.makeFullAST) {
+            return [ 'EXPLIST', result ];
         }
-        
-        Object.freeze(this.lookaheadSet);
-        Object.freeze(this);
-
-        return this.lookaheadSet;
+        else {
+            return result;
+        }
     }
 
     getParseFunc = (parser) => {
@@ -45,7 +33,7 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
                     const expressionString = expression.expressionString;
                     func = (tokenStream) => {
                         const expressionResult = expressionParse(tokenStream);
-                        return [ 'EXPLIST', expressionResult, [ 'EXPRESSION', 0, expressionString ] ];
+                        return this._getResult(expressionResult);
                     }
                     break;
                 default:
@@ -55,18 +43,27 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
                     for (let i = 0; i < this.expressions.length; i++) {
                         expressionTryParseFuncs.push(this.expressions[i].getTryParseFunc(parser));
                         expressionStrings.push(this.expressions[i].expressionString);
-                        expressionLookaheadSets.push(this.expressions[i].computeLookaheadSetAndFreeze(parser));
+                        expressionLookaheadSets.push(this.expressions[i].getLookaheadSet(parser));
                     }
 
                     func = (tokenStream) => {
-                        const token = tokenStream.currentToken();
+                        const token = tokenStream.tryCurrentToken();
+                        if (token === null)
+                            return new GrammarForge.EmptyNode();//Fall back for an empty program.
+
                         for (let i = 0; i < this.expressions.length; i++) {
-                            if (!expressionLookaheadSets[i].has(token.type))
-                                continue;
+                            if (token.type === 'SYMBOL') {
+                                if (!expressionLookaheadSets[i].has(token.value))
+                                    continue;
+                            }
+                            else {
+                                if (!expressionLookaheadSets[i].has(token.type))
+                                    continue;
+                            }
 
                             const tryParseResult = expressionTryParseFuncs[i](tokenStream);
                             if (tryParseResult) {
-                                return [ 'EXPLIST', tryParseResult, [ 'EXPRESSION', i, expressionStrings[i] ] ];
+                                return this._getResult(tryParseResult);
                             }
                         }
 
@@ -98,7 +95,7 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
                         if (!tryParseResult)
                             return null;
                         
-                        return [ 'EXPLIST', tryParseResult, [ 'EXPRESSION', 0, expressionString ] ];
+                        return this._getResult(tryParseResult);
                     }
                     break;
                 default:
@@ -108,7 +105,7 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
                     for (let i = 0; i < this.expressions.length; i++) {
                         expressionTryParseFuncs.push(this.expressions[i].getTryParseFunc(parser));
                         expressionStrings.push(this.expressions[i].expressionString);
-                        expressionLookaheadSets.push(this.expressions[i].computeLookaheadSetAndFreeze(parser));
+                        expressionLookaheadSets.push(this.expressions[i].getLookaheadSet(parser));
                     }
 
                     tryFunc = (tokenStream) => {
@@ -117,12 +114,18 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
                             return null;
                         
                         for (let i = 0; i < this.expressions.length; i++) {
-                            if (!expressionLookaheadSets[i].has(token.type))
-                                continue;
+                            if (token.type === 'SYMBOL') {
+                                if (!expressionLookaheadSets[i].has(token.value))
+                                    continue;
+                            }
+                            else {
+                                if (!expressionLookaheadSets[i].has(token.type))
+                                    continue;
+                            }
 
                             const tryParseResult = expressionTryParseFuncs[i](tokenStream);
                             if (tryParseResult) {
-                                return [ 'EXPLIST', tryParseResult, [ 'EXPRESSION', i, expressionStrings[i] ] ];
+                                return this._getResult(tryParseResult);
                             }
                         }
 
@@ -137,114 +140,49 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    getCheckFunction = (exec) => {
-        return (ast) => {
-            exec.check_required(ast);
-        }
+    setNonTerminalIndexs = (containsOptional) => {
+        const firstExpression = this.expressions[0];
+        const firstExpressionNonTerminalIndexesCount = firstExpression.setNonTerminalIndexs(containsOptional);
+        if (firstExpressionNonTerminalIndexesCount <= 0)
+            return 0;
+
+        if (this.expressions.length === 1)
+            return firstExpressionNonTerminalIndexesCount;
+
+        return this.getNonTerminalsFromIndexs(containsOptional).length;
     }
 
-    getBaseFunction = (exec) => {
-        if (!this.expressions || this.expressions.length === 0)
-            throw new Error("ExpList has no expressions");
+    getNonTerminalsFromIndexs = (containsOptional) => {
+        const firstExpression = this.expressions[0];
+        const firstExpressionNonTerminals = firstExpression.getNonTerminalsFromIndexs(containsOptional);
+        for (const nonTerminal of firstExpressionNonTerminals) {
+            if (nonTerminal.value === undefined)
+                throw new Error(`Non-terminal in expression ${firstExpression.expressionString} has no value.`);
+        }
 
-        const expressionBaseFuncs = [];
-        const expressionStrings = [];
-        for (let i = 0; i < this.expressions.length; i++) {
+        for (let i = 1; i < this.expressions.length; i++) {
             const expression = this.expressions[i];
-            expressionBaseFuncs.push(expression.getBaseFunction(exec));
-            expressionStrings.push(expression.expressionString);
-        }
-        
-        const checkFunc = this.getCheckFunction(exec);
-        return (ast) => {
-            exec.check_length(ast, 3);
-            const [ type, innerAST, expressionInfo ] = ast;
-            if (type !== 'EXPLIST')
-                throw new Error(`Expected ${'EXPLIST'} node, found ${type}`);
-
-            const [expressionInfoType, index, expressionStr] = expressionInfo;
-            if (expressionInfoType !== 'EXPRESSION')
-                throw new Error(`Expected EXPRESSION node, found ${type}`);
-
-            if (expressionStr !== expressionStrings[index])
-                throw new Error(`Expression string mismatch for ExpList ${this.expListString} at index ${index}. Expected: ${expressionStrings[index]}, found: ${expressionStr}`);
-
-            const expressionBaseFunc = expressionBaseFuncs[index];
-            if (!expressionBaseFunc)
-                throw new Error(`No exec function found for expression index ${index} in ExpList ${this.expListString}`);
-
-            checkFunc(innerAST);
-            
-            return expressionBaseFunc(innerAST);
-        }
-    }
-
-    tryGetNonTerminals = () => {
-        const nonTerminals = this.expressions[0].tryGetNonTerminals();
-        if (nonTerminals === null)
-            return null;
-
-        for (let i = 1; i < this.expressions.length; i++) {
-            const exprNonTerminals = this.expressions[i].tryGetNonTerminals();
-            if (exprNonTerminals === null)
-                return null;
-
-            if (exprNonTerminals.length !== nonTerminals.length)
-                return null;
-
-            for (let j = 0; j < nonTerminals.length; j++) {
-                if (exprNonTerminals[j] !== nonTerminals[j])
-                    return null;
+            const expressionNonTerminals = expression.getNonTerminalsFromIndexs(containsOptional);
+            let match = true;
+            if (expressionNonTerminals.length !== firstExpressionNonTerminals.length) {
+                match = false;
             }
-        }
-
-        return nonTerminals;
-    }
-
-    hasNonTerminal = () => {
-        //If this function passes, it means you can treat it's output as if there is only one expression because 
-        // they have the same order and structure, just different terminal symbols.
-
-        if (this.expressions.length === 1) {
-            return this.expressions[0].hasNonTerminal();
-        }
-
-        const firstNonTerminalIndexes = this.expressions[0].getNonTerminals();
-        if (firstNonTerminalIndexes.length === 0)
-            return false;
-
-        //Check indexes match for all sub-expressions
-        for (let i = 1; i < this.expressions.length; i++) {
-            const exprNonTerminalIndexes = this.expressions[i].getNonTerminals();
-            if (firstNonTerminalIndexes.length !== exprNonTerminalIndexes.length)
-                return false;
-
-            for (let j = 0; j < firstNonTerminalIndexes.length; j++) {
-                if (firstNonTerminalIndexes[j] !== exprNonTerminalIndexes[j])
-                    return false;
+            else {
+                for (let j = 0; j < firstExpressionNonTerminals.length; j++) {
+                    const firstNonTerminal = firstExpressionNonTerminals[j];
+                    const expressionNonTerminal = expressionNonTerminals[j];
+                    if (firstNonTerminal.value !== expressionNonTerminal.value) {
+                        match = false;
+                        break;
+                    }
+                }
             }
+
+            if (!match)
+                throw new Error(`All expressions in an ExpList must have the same non-terminals and they must be in the same order in each expression.  Expression 0 does not match expression ${i}.\nExpression 0 non-terminals: ${firstExpressionNonTerminals.map(nt => nt.toString()).join(", ")}\nExpression ${i} non-terminals: ${expressionNonTerminals.map(nt => nt.toString()).join(", ")}`);
         }
 
-        //Index matches don't garuntee the types match, so check types too
-        const firstNonTerminals = this.expressions[0].tryGetNonTerminals();
-        if (firstNonTerminals === null)
-            return false;
-
-        for (let i = 1; i < this.expressions.length; i++) {
-            const exprNonTerminals = this.expressions[i].tryGetNonTerminals();
-            if (exprNonTerminals === null)
-                return false;
-
-            if (exprNonTerminals.length !== firstNonTerminals.length)
-                return false;
-
-            for (let j = 0; j < firstNonTerminals.length; j++) {
-                if (exprNonTerminals[j] !== firstNonTerminals[j])
-                    return false;
-            }
-        }
-
-        return true;
+        return firstExpressionNonTerminals;
     }
 
     getChildren = (parser, childrenIndexSet) => {
@@ -253,8 +191,12 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
             expr.getChildren(parser, childrenIndexSet);
         }
     }
+    
+    // walk = function*() {
+    //     yield this.expressions;
+    // }
 
-    toString() {
-        return `${this.expressions.map(expr => expr.toString()).join(" | ")}`;
+    toString(useNewlines = false) {
+        return `${this.expressions.map(expr => expr.toString()).join(useNewlines ? "\n| " : " | ")}`;
     }
 }

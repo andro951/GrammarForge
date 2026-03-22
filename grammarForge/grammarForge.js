@@ -71,6 +71,8 @@ const GrammarForge = class GrammarForge {
         this.setup();
     }
 
+    static makeFullAST = false;
+
     setup = () => {
         this.processGrammar();
         this.createLexer();
@@ -80,8 +82,11 @@ const GrammarForge = class GrammarForge {
 
     processGrammar = () => {
         let grammarTokens = GrammarForge.GrammarLexer.tokenize(this.grammar);
-        const { rules, tokenDefinitions } = GrammarForge.GrammarParser.parse(grammarTokens);
+        const { rules, tokenDefinitions, expressions, expressionByRuleNameThenExpressionStringLookup } = GrammarForge.GrammarParser.parse(grammarTokens);
+
         this.rules = rules;
+        this.expressions = expressions;
+        this.expressionByRuleNameThenExpressionStringLookup = expressionByRuleNameThenExpressionStringLookup;
 
         if (tokenDefinitions.length > 0) {
             if (this.argTokenDefinitions && this.argTokenDefinitions.length > 0) {
@@ -109,7 +114,7 @@ const GrammarForge = class GrammarForge {
     }
 
     createExec = () => {
-        this.execution = new GrammarForge.Exec(this.parser, this.functions);
+        this.execution = new GrammarForge.Exec(this.parser, this.expressions, this.expressionByRuleNameThenExpressionStringLookup, this.functions);
     }
 
     parse = (str) => {

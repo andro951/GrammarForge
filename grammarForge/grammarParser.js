@@ -27,12 +27,18 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
         static index = 0;
         static rules = [];
         static tokenDefinitions = [];
+        static nextExpressionIndex = 0;
+        static expressions = [];
+        static expressionByRuleNameThenExpressionStringLookup = new Map();//Contains only expressions that are part of a rule.
 
         static parse(tokens) {
             GrammarParser.tokens = tokens;
             GrammarParser.index = 0;
             GrammarParser.rules = [];
             GrammarParser.tokenDefinitions = [];
+            GrammarParser.nextExpressionIndex = 0;
+            GrammarParser.expressions = [];
+            GrammarParser.expressionByRuleNameThenExpressionStringLookup = new Map();
             return GrammarParser.grammar();
         }
 
@@ -66,7 +72,12 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
                 GrammarParser.stmt();
             }
 
-            return { rules: GrammarParser.rules, tokenDefinitions: GrammarParser.tokenDefinitions };
+            Object.freeze(GrammarParser.rules);
+            //token definitions are frozen in the lexer constructor.
+            Object.freeze(GrammarParser.expressions);
+            Object.freeze(GrammarParser.expressionByRuleNameThenExpressionStringLookup);
+
+            return { rules: GrammarParser.rules, tokenDefinitions: GrammarParser.tokenDefinitions, expressions: GrammarParser.expressions, expressionByRuleNameThenExpressionStringLookup: GrammarParser.expressionByRuleNameThenExpressionStringLookup };
         }
         
         static ruleSet = ["IDENTIFIER"];
@@ -105,24 +116,34 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
 
             GrammarParser.match("DEFINED_AS");
 
-            const expList = GrammarParser.expList(true);
+            const expList = GrammarParser.expList(true, true);
 
             const rule = new GrammarForge.Rule(tokenName, expList, GrammarParser.rules.length, tag);
+            const ruleMap = new Map();
+            for (const exp of expList.expressions) {
+                exp.rule = rule;
+                ruleMap.set(exp.expressionString, exp);
+            }
+
+            GrammarParser.expressionByRuleNameThenExpressionStringLookup.set(tokenName, ruleMap);
             GrammarParser.rules.push(rule);
         }
 
         //expList : exp (ORBAR exp)*
-        static expList(metaDataAllowed) {
+        static expList(metaDataAllowed, calledFromRule) {
             if (metaDataAllowed === undefined)
                 throw new Error(`expList: metaDataAllowed parameter is required.`);
 
+            if (calledFromRule === undefined)
+                throw new Error(`expList: calledFromRule parameter is required.`);
+
             let expressions = [];
             let index = 0;
-            const exp = GrammarParser.exp(index++, metaDataAllowed);
+            const exp = GrammarParser.exp(index++, metaDataAllowed, calledFromRule);
             expressions.push(exp);
             while (GrammarParser.index < GrammarParser.tokens.length && GrammarParser.tokens[GrammarParser.index].type === "ORBAR") {
                 GrammarParser.match("ORBAR");
-                const exp2 = GrammarParser.exp(index++, metaDataAllowed);
+                const exp2 = GrammarParser.exp(index++, metaDataAllowed, calledFromRule);
                 expressions.push(exp2);
             }
             
@@ -130,7 +151,7 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
         }
 
         //exp     : wordBase+ (LBRACE IDENTIFIER (IDENTIFIER | INT | TOKEN)* RBRACE)?
-        static exp(index, metaDataAllowed) {
+        static exp(index, metaDataAllowed, calledFromRule) {
             if (metaDataAllowed === undefined)
                 throw new Error(`exp: metaDataAllowed parameter is required.`);
 
@@ -159,7 +180,7 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
                         throw new Error(`Metadata not allowed in this expression at index ${GrammarParser.index}`);
 
                     const token = GrammarParser.tokens[GrammarParser.index];
-                    if (token.type !== "IDENTIFIER" && token.type !== 'SYMBOL' && token.type !== "PLUS" && token.type !== "STAR")
+                    if (token.type !== "IDENTIFIER" && token.type !== 'MATH_SYMBOL' && token.type !== "PLUS" && token.type !== "STAR")
                         throw new Error(`Unexpected token type in expression metadata: ${token.type}`);
 
                     GrammarParser.match(token.type);
@@ -175,7 +196,9 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
                 }
             }
 
-            return new GrammarForge.Expression(words, index, metadata);
+            const expression = new GrammarForge.Expression(words, index, GrammarParser.nextExpressionIndex++, metadata);
+            GrammarParser.expressions.push(expression);
+            return expression;
         }
 
         // wordBase: word
@@ -252,7 +275,7 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
         //par     : LPAREN expList RPAREN
         static par() {
             GrammarParser.match("LPAREN");
-            const expList = GrammarParser.expList(false);
+            const expList = GrammarParser.expList(false, false);
             GrammarParser.match("RPAREN");
             
             return new GrammarForge.Par(expList);

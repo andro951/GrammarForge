@@ -14,7 +14,7 @@
             new TokenDefinition("COMMENT_SLASH", /\/\/.*$/m, 'IGNORE'),
             new TokenDefinition("COMMENT_BLOCK", /\/\*[\s\S]*?\*\//, 'IGNORE'),
             new TokenDefinition("REGEX", /\/(?:\\.|[^\t\r\n\f\v\/])+\/[gimsuy]*/),
-            new TokenDefinition("SYMBOL", /(?:[^a-zA-Z0-9(){}\s/]{2,}|[^a-zA-Z0-9(){}\s+*?|])/),
+            new TokenDefinition("MATH_SYMBOL", /(\|\||&&|==|!=|<=|>=|-#|\+#|[<>\-\/%!^])/),
             new TokenDefinition("ORBAR", /\|/),
             new TokenDefinition("STAR", /\*/),
             new TokenDefinition("PLUS", /\+/),
@@ -23,7 +23,6 @@
             //new TokenDefinition("STRING", /'(?:\\.|[^'])*'|"(?:\\.|[^"])*"/),
             new TokenDefinition("IDENTIFIER", /[a-zA-Z_][a-zA-Z0-9_]*/),
             new TokenDefinition("INT", /\d+/),
-            new TokenDefinition("SYMBOL", /[^\s:|()*+?'"`;]+/),
         ]
         
         static lexer = new GrammarForge.Lexer(this.grammarTokens);

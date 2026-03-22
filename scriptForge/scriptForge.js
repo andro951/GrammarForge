@@ -15,7 +15,7 @@ const ScriptForge = class ScriptForge {
     //  Parameters: (error, key, scriptText)
     //  Called when there is an error parsing a script.
     //  The script will not be registered if there is a parse error.
-    constructor(grammarForge, { onErrorInScriptFunction = null, onErrorDuringActionFunction = null, onParseScriptErrorFunction = null, disableTryCatch = false, logExecutionTime = false }) {
+    constructor(grammarForge, { onErrorInScriptFunction = null, onErrorDuringActionFunction = null, onParseScriptErrorFunction = null, disableTryCatch = false, logExecutionTime = false } = {}) {
         if (!(grammarForge instanceof GrammarForge))
             throw new Error('grammarForge must be an instance of GrammarForge');
             

@@ -5,29 +5,25 @@ GrammarForge.Term = class Term extends GrammarForge.Word {
         super();
         this.type = token.type;
         this.value = token.value;
-        
         this.string = this.toString();
     }
 
-    computeLookaheadSetAndFreeze(parser) {
-        if (this.lookaheadSet)
-            return this.lookaheadSet;
-        
+    //Returns true if left recursion was checked and not found
+    //Throws an error if left recursion is found
+    //Returns false if this word was not a match, but is optional
+    checkWordForLeftRecursion = (parser, expr, lookAheadSet) => {
         if (this.type === "IDENTIFIER") {
             const rule = parser.getRule(this.value);
             if (!rule)
-                throw new Error(`No rule found for identifier ${this.value}`);
+                throw new Error(`No rule found for identifier ${this.value} in expression: ${expr.expressionString}`);
 
-            this.lookaheadSet = rule.computeLookaheadSetAndFreeze(parser);
+            return rule.checkLeftRecursion(parser, lookAheadSet);
         }
-        else {
-            this.lookaheadSet = new Set([this.value]);
+        else if (lookAheadSet) {
+            lookAheadSet.add(this.value);
         }
-
-        Object.freeze(this.lookaheadSet);
-        Object.freeze(this);
-
-        return this.lookaheadSet;
+        
+        return true;//Found and checked the first non-optional word
     }
 
     getParseFunc = (parser) => {
@@ -42,19 +38,19 @@ GrammarForge.Term = class Term extends GrammarForge.Word {
                         throw new Error(`No rule found for identifier ${this.value}`);
 
                     func = (tokenStream) => {
-                        return [ 'TERM', parser.ruleFunctions[rule.index](tokenStream), type ];
+                        return parser.ruleFunctions[rule.index](tokenStream);
                     };
                     break;
                 case "TOKEN":
                     const tokenType = this.value;
                     func = (tokenStream) => {
-                        return [ 'TERM', parser.token(tokenStream, tokenType), type ];
+                        return parser.token(tokenStream, tokenType);
                     };
                     break;
                 case "SYMBOL":
                     const symbol = this.value;
                     func = (tokenStream) => {
-                        return [ 'TERM', parser.symbol(tokenStream, symbol), type ];
+                        return parser.symbol(tokenStream, symbol);
                     };
                     break;
                 default:
@@ -83,7 +79,7 @@ GrammarForge.Term = class Term extends GrammarForge.Word {
                         if (!tryResult)
                             return null;
 
-                        return [ 'TERM', tryResult, type ];
+                        return tryResult;
                     };
                     break;
                 case "TOKEN":
@@ -93,7 +89,7 @@ GrammarForge.Term = class Term extends GrammarForge.Word {
                         if (!tryResult)
                             return null;
 
-                        return [ 'TERM', tryResult, type ];
+                        return tryResult;
                     };
                     break;
                 case "SYMBOL":
@@ -103,7 +99,7 @@ GrammarForge.Term = class Term extends GrammarForge.Word {
                         if (!tryResult)
                             return null;
 
-                        return [ 'TERM', tryResult, type ];
+                        return tryResult;
                     };
                     break;
                 default:
@@ -116,97 +112,18 @@ GrammarForge.Term = class Term extends GrammarForge.Word {
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    getCheckFunction = (exec) => {
-        switch (this.type) {
-            case "IDENTIFIER":
-                const ruleName = this.value;
-                return (ast) => {
-                    exec.check_type(ast, ruleName);
-                };
-            case "TOKEN":
-                const tokenType = this.value;
-                return (ast) => {
-                    return exec.check_token(ast, tokenType);
-                }
-            case "SYMBOL":
-                const symbol = this.value;
-                return (ast) => {
-                    return exec.check_symbol(ast, symbol);
-                }
-            default:
-                throw new Error(`getCheckFunction: ${this.type} not supported`);
-        }
+    setNonTerminalIndexs = (containsOptional) => {
+        if (this.type === "IDENTIFIER")
+            return 1;
+
+        return 0;
     }
 
-    getBaseFunction = (exec) => {
-        const thisType = this.type;
-        const checkFunc = this.getCheckFunction(exec);
-        switch (this.type) {
-            case "IDENTIFIER":
-                const rule = exec.getRule(this.value);
-                if (!rule)
-                    throw new Error(`No rule found for identifier ${this.value}`);
-
-                const ruleIndex = rule.index;
-                return (ast) => {
-                    const [ termType, innerAST, type ] = ast;
-                    if (termType !== "TERM")
-                        throw new Error(`Expected TERM AST node, got ${termType}`);
-
-                    if (type !== thisType)
-                        throw new Error(`Expected TERM type ${thisType}, got ${type}`);
-
-                    checkFunc(innerAST);
-
-                    return () => {
-                        return exec.ruleFunctions[ruleIndex](innerAST);
-                    }
-                };
-            case "TOKEN":
-                const tokenType = this.value;
-                return (ast) => {
-                    const [ termType, innerAST, type ] = ast;
-                    if (termType !== "TERM")
-                        throw new Error(`Expected TERM AST node, got ${termType}`);
-
-                    if (type !== thisType)
-                        throw new Error(`Expected TERM type ${thisType}, got ${type}`);
-
-                    checkFunc(innerAST);
-
-                    return () => {
-                        return exec.token(innerAST, tokenType);
-                    }
-                };
-            case "SYMBOL":
-                return (ast) => {
-                    const [ termType, innerAST, type ] = ast;
-                    if (termType !== "TERM")
-                        throw new Error(`Expected TERM AST node, got ${termType}`);
-
-                    if (type !== thisType)
-                        throw new Error(`Expected TERM type ${thisType}, got ${type}`);
-
-                    checkFunc(innerAST);
-                    
-                    return () => {
-                        return innerAST[1];//TODO
-                    }
-                }
-            default:
-                throw new Error(`getExecFunction: ${this.type} not supported`);
-        }
-    }
-
-    tryGetNonTerminals = () => {
+    getNonTerminalsFromIndexs = (containsOptional) => {
         if (this.type === "IDENTIFIER")
             return [ this ];
 
         return [];
-    }
-
-    hasNonTerminal = () => {
-        return this.type === "IDENTIFIER";
     }
 
     getChildren = (parser, childrenIndexSet) => {
@@ -222,6 +139,10 @@ GrammarForge.Term = class Term extends GrammarForge.Word {
             rule.getChildren(parser, childrenIndexSet);
         }
     }
+
+    // walk = function*() {
+    //     yield this;
+    // }
 
     toString() {
         return `${this.value}`;

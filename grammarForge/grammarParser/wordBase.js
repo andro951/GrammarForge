@@ -6,10 +6,6 @@ GrammarForge.WordBase = class WordBase {
             throw new Error("Abstract class 'WordBase' cannot be instantiated directly.");
         }
     }
-    
-    computeLookaheadSetAndFreeze(parser) {
-        throw new Error("Not implemented");
-    }
 
     getParseFunc = (parser) => {
         throw new Error("Not implemented");
@@ -19,17 +15,21 @@ GrammarForge.WordBase = class WordBase {
         throw new Error("Not implemented");
     }
 
-    getCheckFunction = (exec) => {
+    setNonTerminalIndexs = (containsOptional) => {
         throw new Error("Not implemented");
     }
 
-    getBaseFunction = (exec) => {
+    getNonTerminalsFromIndexs = (containsOptional) => {
         throw new Error("Not implemented");
     }
 
-    tryGetNonTerminals = () => {
+    getChildren = (parser, childrenIndexSet) => {
         throw new Error("Not implemented");
     }
+
+    // walk = function*() {
+    //     throw new Error("Not implemented");
+    // }
 
     toString() {
         throw new Error("Not implemented");

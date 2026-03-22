@@ -1,7 +1,7 @@
 "use strict";
 
 GrammarForge.Expression = class Expression {
-    constructor(words, index, metadata = []) {
+    constructor(words, index, expressionIndex, metadata = []) {
         if (!words)
             throw new Error("words is required");
 
@@ -13,9 +13,13 @@ GrammarForge.Expression = class Expression {
 
         this.words = words;
         this.index = index;
+        this.expressionIndex = expressionIndex;
         this.metadata = metadata;
+        this.rule = null;//Set in GrammarForge.GrammarParser
         this.tag = this.metadata.length > 0 ? this.metadata[0] : null;
         this.expressionString = this.toString();
+        this.execFunc = null;
+        this.automaticallyGeneratedFunc = true;
         this.subFuncString = this.expressionString + `$E`;
         Object.freeze(this.words);
     }
@@ -76,24 +80,191 @@ GrammarForge.Expression = class Expression {
         this.tag = null;
     }
 
-    computeLookaheadSetAndFreeze(parser) {
-        if (this.lookaheadSet)
-            return this.lookaheadSet;
-        
-        this.lookaheadSet = new Set();
-        if (this.words.length < 1)
-            throw new Error("Tried to compute lookahead set for empty expression.");
+    getLookaheadSet = (parser) => {
+        this.checkWordsForLeftRecursion(parser, null, this.rule === null);
+        if (!this.lookAheadSet)
+            throw new Error("Lookahead set should have been computed in checkWordsForLeftRecursion.");
 
-        const firstWord = this.words[0];
-        const firstSet = firstWord.computeLookaheadSetAndFreeze(parser);
-        for (const token of firstSet) {
-            this.lookaheadSet.add(token);
+        return this.lookAheadSet;
+    }
+
+    checkWordsForLeftRecursion = (parser, lookAheadSet) => {
+        if (this.lookAheadSet) {
+            if (lookAheadSet !== null) {
+                for (const token of this.lookAheadSet) {
+                    lookAheadSet.add(token);
+                }
+            }
+            
+            return true;
         }
 
-        Object.freeze(this.lookaheadSet);
-        Object.freeze(this);
+        //The goal is to find the first non-optional word, or the first optional word that is this rule
+        this.lookAheadSet = new Set();
+        let found = false;
+        for (const word of this.words) {
+            const checked = word.checkWordForLeftRecursion(parser, this, this.lookAheadSet);
+            if (checked) {
+                found = true;
+                break;
+            }
+        }
 
-        return this.lookaheadSet;
+        if (lookAheadSet !== null) {
+            for (const wordValue of this.lookAheadSet) {
+                lookAheadSet.add(wordValue);
+            }
+        }
+
+        return found;
+    }
+
+    _getResult = (originalResult) => {
+        if (GrammarForge.makeFullAST) {
+            return new GrammarForge.ExpNode(this, originalResult);
+        }
+        else {
+            let result = originalResult;
+            if (this.automaticallyGeneratedFunc && this.nonTerminalIndexs !== undefined && this.nonTerminalIndexs.length > 0) {
+                if (this.nonTerminalIndexs.length === 1) {
+                    result = originalResult[this.nonTerminalIndexs[0]];
+                }
+                else {
+                    result = this.nonTerminalIndexs.map(i => originalResult[i]);
+                }
+
+                //console.log(`${originalResult} -> ${result}`);
+
+                if (this.execFunc === null)
+                    return result;
+            }
+            
+            if (this.execFunc === null) {
+                if (result.length === 1) {
+                    //console.log(`${result} -> ${result[0]}`);
+                    return result[0];
+                }
+                else {
+                    return result;
+                }
+            }
+            else {
+                if (this.automaticallyGeneratedFunc) {
+                    if (this.rule !== null && this.rule.tag !== null) {
+                        switch (this.rule.tag) {
+                            case 'sl':
+                                //sl knows it is only supposed to have 1 word.
+                                if (Array.isArray(result)) {
+                                    if (result.length === 0) {
+                                        return new GrammarForge.EmptyNode();//This is better for allowing it to fall through when parsing failed.
+                                        //throw new Error("Expected at least 1 statement in statement list, but got an empty array.");
+                                    }
+
+                                    const firstWordResult = result[0];
+                                    if (!(firstWordResult instanceof GrammarForge.ExpNode))
+                                        throw new Error("Expected an ExpNode result for statement list expression with 1 statement, but got: " + firstWordResult);
+
+                                    if (result.length < 2)
+                                        throw new Error("Expected at least 2 statements in statement list for it to be a + or * expression, but got: " + nonTerminalWordResult);
+
+                                    return new GrammarForge.ExpNode(this, result);
+                                }
+                                else {
+                                    if (!(result instanceof GrammarForge.ExpNode))
+                                        throw new Error("Expected an ExpNode result for statement list expression with 1 statement, but got: " + nonTerminalWordResult);
+
+                                    return result;
+                                }
+                            case 'stmt':
+                                //Do nothing for stmt.
+                                break;
+                            case 'block':
+                                return new GrammarForge.ExpNode(this, result);
+                            case 'exp':
+                                //Do nothing for exp.
+                                break;
+                            default:
+                                throw new Error(`No automatically generated function for expression with rule tag: ${this.rule.tag}`);
+                        }
+                    }
+
+                    if (result instanceof GrammarForge.AstNode)
+                        return new GrammarForge.ExpNode(this, result);
+
+                    switch (this.tag) {
+                        case 'declare':
+                            return new GrammarForge.ExpNode(this, result);
+                        case 'get':
+                            return new GrammarForge.ExpNode(this, result);
+                        case 'assign':
+                            return new GrammarForge.ExpNode(this, result);
+                        case 'while':
+                            return new GrammarForge.ExpNode(this, result);
+                        case 'foreach':
+                            return new GrammarForge.ExpNode(this, result);
+                        case 'if':
+                            return new GrammarForge.ExpNode(this, result);
+                        case 'par':
+                            return result;
+                        case 'continue':
+                            return new GrammarForge.ExpNode(this, undefined);
+                        case 'break':
+                            return new GrammarForge.ExpNode(this, undefined);
+                        case 'return':
+                            return new GrammarForge.ExpNode(this, result);
+                        case 'func_declare':
+                            return new GrammarForge.ExpNode(this, result);
+                        case 'func_call':
+                            return new GrammarForge.ExpNode(this, result);
+                        case null:
+                            if (result.length === 1) {
+                                if (this.execFunc !== null) {
+                                    return new GrammarForge.ExpNode(this, result[0]);
+                                }
+                                else {
+                                    //console.log(`${result} -> ${result[0]}`);
+                                    return result[0];
+                                }
+                            }
+                            else {
+                                if (this.execFunc === null) {
+                                    return result;
+                                }
+                                else {
+                                    let existingTermCount = 0;
+                                    let existingTermIndex = -1;
+                                    for (let i = 0; i < result.length; i++) {
+                                        const item = result[i];
+                                        if (Array.isArray(item) ? item.length > 0: !item.empty) {
+                                            existingTermCount++;
+                                            if (existingTermCount > 1)
+                                                break;
+
+                                            existingTermIndex = i;
+                                        }
+                                    }
+                                    
+                                    if (existingTermCount > 1) {
+                                        return new GrammarForge.ExpNode(this, result);
+                                    }
+                                    else {
+                                        if (existingTermIndex === -1)
+                                            throw new Error("Expected to find at least 1 term in the result for an expression with an automatically generated function, but found none.  Result: " + result);
+
+                                        //console.log(`${result} -> ${result[existingTermIndex]}`);
+                                        return result[existingTermIndex];
+                                    }
+                                }
+                            }
+                        default:
+                            throw new Error(`No automatically generated function for expression tag: ${this.tag}`);
+                    }
+                }
+                else {
+                    return new GrammarForge.ExpNode(this, result);
+                }
+            }
+        }
     }
 
     getParseFunc = (parser) => {
@@ -101,6 +272,8 @@ GrammarForge.Expression = class Expression {
         if (funcIndex === undefined) {
             if (this.words.length === 0)
                 throw new Error("Cannot create parse function for empty expression");
+
+            const expressionString = this.expressionString;
 
             let func;
             const length = this.words.length;
@@ -110,6 +283,8 @@ GrammarForge.Expression = class Expression {
             }
 
             func = (tokenStream) => {
+                const expStr = expressionString;
+                
                 const result = [];
                 for (let i = 0; i < wordFunctions.length; i++) {
                     const wordResult = wordFunctions[i](tokenStream);
@@ -119,7 +294,10 @@ GrammarForge.Expression = class Expression {
                     result.push(wordResult);
                 }
 
-                return [ 'EXP', result, ['LENGTH', length] ];
+                const finalResult = this._getResult(result, this);
+                
+                //console.log(`finalResult: ${finalResult} of ${expStr}`);
+                return finalResult;
             }
 
             funcIndex = parser.addSubFunction(this.subFuncString, func);
@@ -134,6 +312,8 @@ GrammarForge.Expression = class Expression {
             if (this.words.length === 0)
                 throw new Error("Cannot create parse function for empty expression");
 
+            const expressionString = this.expressionString;
+
             let tryFunc;
             const length = this.words.length;
             const wordTryFunctions = [];
@@ -142,6 +322,8 @@ GrammarForge.Expression = class Expression {
             }
 
             tryFunc = (tokenStream) => {
+                const expStr = expressionString;
+
                 const clonedStream = tokenStream.clone();
                 const result = [];
                 for (let i = 0; i < wordTryFunctions.length; i++) {
@@ -153,7 +335,10 @@ GrammarForge.Expression = class Expression {
                 }
 
                 tokenStream.index = clonedStream.index;
-                return [ 'EXP', result, ['LENGTH', length] ];
+                
+                const finalResult = this._getResult(result, this);
+                //console.log(`finalResult: ${finalResult} of ${expStr}`);
+                return finalResult;
             }
 
             funcIndex = parser.addTrySubFunction(this.subFuncString, tryFunc);
@@ -162,77 +347,44 @@ GrammarForge.Expression = class Expression {
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    getCheckFunction = (exec) => {
-        const length = this.words.length;
-        return (ast) => {
-            exec.check_length(ast, length);
-        }
-    }
+    setNonTerminalIndexs = (containsOptional) => {
+        let count = 0;
+        if (this.nonTerminalIndexs !== undefined) {
+            for (let i = 0; i < this.nonTerminalIndexs.length; i++) {
+                const word = this.words[this.nonTerminalIndexs[i]];
+                let wordCount = word.setNonTerminalIndexs(containsOptional);
+                if (wordCount <= 0)
+                    throw new Error("Expected to find at least 1 non-terminal in word: " + word.toString());
 
-    getBaseFunction = (exec) => {
-        //const exprString = this.expressionString;
-        const baseFunctions = [];
-        for (let i = 0; i < this.words.length; i++) {
-            baseFunctions.push(this.words[i].getBaseFunction(exec));
-        }
-
-        const len = this.words.length;
-        const checkFunc = this.getCheckFunction(exec);
-        return (ast) => {
-            const [ expType, innerAST, lengthInfo ] = ast;
-            if (expType !== 'EXP')
-                throw new Error(`Expected EXP AST node, got ${expType}`);
-
-            const [ lengthTag, length ] = lengthInfo;
-            if (lengthTag !== 'LENGTH')
-                throw new Error(`Expected LENGTH info in EXP AST node, got ${lengthTag}`);
-
-            if (length !== len)
-                throw new Error(`Expected EXP AST node length ${len}, got ${length}`);
-
-            checkFunc(innerAST);
-
-            const results = [];
-            for (let i = 0; i < baseFunctions.length; i++) {
-                results.push(baseFunctions[i](innerAST[i]));
+                count += wordCount;
             }
-
-            //const t = exprString;
-            
-            return results;
         }
+        else {
+            this.nonTerminalIndexs = [];
+            for (let i = 0; i < this.words.length; i++) {
+                const word = this.words[i];
+                let wordCount = word.setNonTerminalIndexs(containsOptional);
+                if (wordCount > 0) {
+                    count += wordCount;
+                    this.nonTerminalIndexs.push(i);
+                }
+            }
+        }
+
+        return count;
     }
 
-    tryGetNonTerminals = () => {
+    getNonTerminalsFromIndexs = (containsOptional) => {
+        if (this.nonTerminalIndexs === undefined)
+            this.setNonTerminalIndexs(containsOptional);
+
         const nonTerminals = [];
-        for (let i = 0; i < this.words.length; i++) {
-            const word = this.words[i];
-            const wordNonTerminals = word.tryGetNonTerminals();
-            if (!wordNonTerminals)
-                return null;
-
-            if (wordNonTerminals.length === 0)
-                continue;
-
-            nonTerminals.push(...wordNonTerminals);
+        for (let i = 0; i < this.nonTerminalIndexs.length; i++) {
+            const word = this.words[this.nonTerminalIndexs[i]];
+            nonTerminals.push(...word.getNonTerminalsFromIndexs(containsOptional));
         }
 
         return nonTerminals;
-    }
-
-    getNonTerminals = () => {
-        const nonTerminals = [];
-        for (let i = 0; i < this.words.length; i++) {
-            const word = this.words[i];
-            if (word.hasNonTerminal())
-                nonTerminals.push(i);
-        }
-
-        return nonTerminals;
-    }
-
-    hasNonTerminal = () => {
-        return this.getNonTerminals().length > 0;
     }
 
     getChildren = (parser, childrenIndexSet) => {
@@ -241,6 +393,12 @@ GrammarForge.Expression = class Expression {
             word.getChildren(parser, childrenIndexSet);
         }
     }
+
+    // walk = function*() {
+    //     for (const word of this.words) {
+    //         yield* word.walk();
+    //     }
+    // }
 
     toString() {
         return this.words.map(word => word.toString()).join(" ");

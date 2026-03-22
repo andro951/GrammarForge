@@ -20,6 +20,6 @@ GrammarForge.TokenDefinition = class TokenDefinition {
     }
 
     toString() {
-        return `${this.type} ::= ${this.regex}`;
+        return `${this.type} ::= ${this.regex}${this.tag ? ` (${this.tag})` : ''}`;
     }
 }

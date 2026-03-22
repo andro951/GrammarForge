@@ -11,8 +11,8 @@ GrammarForge.FunctionDeclaration = class FunctionDeclaration {
 
         this.parameters = parameters;
 
-        if (typeof body !== 'function')
-            throw new Error("body must be a function");
+        if (!(body instanceof GrammarForge.ExpNode))
+            throw new Error("body must be a GrammarForge.ExpNode");
 
         this.body = body;
 
@@ -45,7 +45,7 @@ GrammarForge.FunctionDeclaration = class FunctionDeclaration {
             exec.declare_variable(paramName, argValue);
         }
 
-        const result = exec.ev(this.body);
+        const result = this.body.exec();
         
         exec.pop_block_scope();
 

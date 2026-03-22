@@ -31,6 +31,18 @@
         return regex;
     }
 
+    GrammarForge.astStringIndentCount = 0;
+
+    GrammarForge.astString = (ast) => {
+        GrammarForge.astStringIndentCount = 0;
+        const arr = [];
+        ast.toAstString(arr);
+        if (GrammarForge.astStringIndentCount !== 0)
+            throw new Error("Indent count should be 0 after astString.");
+
+        return arr.join('');
+    }
+
     GrammarForge.printAst = (ast) => {
         let tabs = 0;
         const printNode = (node) => {
@@ -64,5 +76,13 @@
         }
 
         printNode(ast);
+    }
+
+    GrammarForge.getTypeStr = (obj) => {
+        const type = typeof obj;
+        if (type === "object")
+            return obj.constructor.name;
+
+        return type;
     }
 }

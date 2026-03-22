@@ -1,4 +1,4 @@
-const GRAMMAR_FORGE_LIB_VERSION = '1.0.52';
+const GRAMMAR_FORGE_LIB_VERSION = '2.0.0';
 const BASE_URL = 'https://andro951.github.io/GrammarForge/';
 
 const files = [
@@ -20,6 +20,11 @@ const files = [
   'grammarForge/grammarParser/expList.js',
   'grammarForge/grammarParser/rule.js',
   'grammarForge/grammarParser/term.js',
+  'grammarForge/grammarParser/astNode.js',
+  'grammarForge/grammarParser/emptyNode.js',
+  'grammarForge/grammarParser/expNode.js',
+  'grammarForge/grammarParser/tokenNode.js',
+  'grammarForge/grammarParser/symbolNode.js',
   'grammarForge/flowControl.js',
   'grammarForge/functionDeclaration.js',
   'scriptForge/scriptForge.js',

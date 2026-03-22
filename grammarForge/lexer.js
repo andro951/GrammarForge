@@ -11,7 +11,18 @@
             this.index = 0;
             this.tokens = [];
             this.tokenDefinitions.push(new TokenDefinition("WHITESPACE", /\s+/, 'IGNORE'));
+            this.tokenDefinitions.push(new TokenDefinition("SYMBOL", /[^a-zA-Z0-9_\s:|()*+?'"\`;]/));
             this.tokenDefinitions.push(new TokenDefinition("UNKNOWN", /./));
+
+            Object.freeze(this.tokenDefinitions);
+
+            const tokenSet = new Set();
+            for (let tokenDef of this.tokenDefinitions) {
+                if (tokenSet.has(tokenDef.type))
+                    throw new Error(`Duplicate token type: ${tokenDef.type}`);
+
+                tokenSet.add(tokenDef.type);
+            }
         }
 
         tokenize = (str) => {
