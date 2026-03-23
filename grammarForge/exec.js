@@ -11,6 +11,10 @@
             this.ruleTagLookup = this.parser.ruleTagLookup;
             this.stmt_rule = this.ruleTagLookup.get("stmt");
             this.metaExpressionLookup = this.parser.metaExpressionLookup;
+            this.testMode = false;
+            this.logAllTests = false;
+            this.testResults = [];
+            this.printArr = [];
             this.setup(functions);
         }
 
@@ -191,7 +195,13 @@
 
             this.variables = [ variables ];
             this.variableGetters = variableGetters;
+            this.printArr.length = 0;
             const result = this.execute(ast);
+            if (this.printArr.length > 0) {
+                console.log(this.printArr.join("\n"));
+                this.printArr.length = 0;
+            }
+
             this.variables = null;
             this.variableGetters = null;
             return result;
@@ -546,6 +556,20 @@
                             return else_stmt.exec();
                         }
                     }
+                }],
+                ['print', (exp) => {
+                    const val = exp.empty ? '' : exp.exec();
+                    if (execution.testMode) {
+                        execution.testResults.push(val);
+                        if (GrammarForge.debuggingFunctions) {
+                            execution.printArr.push(`print: ${val}`);
+                        }
+                    }
+                    else {
+                        execution.printArr.push(String(val));
+                    }
+
+                    return GrammarForge.NORMAL_CONTROL;
                 }],
                 ['return', (exp) => {
                     const value = exp.exec();

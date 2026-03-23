@@ -1,5 +1,15 @@
 "use strict";
 
+(() => {
+    //Make arrays print as:
+    // [ item1, item2, ... ]
+    //instead of:
+    // item1,item2,...
+    Array.prototype.toString = function() {
+        return `[ ${this ? this.join(", ") : ""} ]`;
+    }
+})();
+
 /*
 GrammarForge is a recursive decent parser generator with backtracking.
 
@@ -144,6 +154,18 @@ const GrammarForge = class GrammarForge {
             throw new Error(`Operator ${op} not defined in precedence level ${precedence}`);
 
         this.execution.opFunctions[precedence].set(op, func);
+    }
+
+    runTests = (tests, testEnvironment) => {
+        this.execution.testMode = true;
+        console.log(`Running ${tests.length} ${testEnvironment} tests...`);
+
+        for (const testCase of tests) {
+            testCase.test(this);
+        }
+
+        console.log(`All ${testEnvironment} tests completed.`);
+        this.execution.testMode = false;
     }
 };
 

@@ -198,6 +198,8 @@ GrammarForge.Expression = class Expression {
                             return new GrammarForge.ExpNode(this, result);
                         case 'assign':
                             return new GrammarForge.ExpNode(this, result);
+                        case 'print':
+                            return new GrammarForge.ExpNode(this, result);
                         case 'while':
                             return new GrammarForge.ExpNode(this, result);
                         case 'foreach':
@@ -419,6 +421,7 @@ GrammarForge.Expression.tags = new Set([
     'return',
     'func_declare',
     'func_call',
+    'print',
     '+',
     '-',
     '*',

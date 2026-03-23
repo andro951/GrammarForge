@@ -309,4 +309,18 @@ const ScriptForge = class ScriptForge {
     manuallyRunScript = (script) => {
         this._runScript(script, ScriptForge.Script.manualTriggerName, null, null, null);
     }
+    runTests = (tests, testEnvironment) => {
+        this.gf.execution.testMode = true;
+        console.log(`Running ${tests.length} ${testEnvironment} tests...`);
+
+        let testNameCounter = 1;
+        for (const testCase of tests) {
+            const testName = `Test${testNameCounter}`;
+            testCase.test(testName, this);
+            testNameCounter++;
+        }
+
+        console.log(`All ${testEnvironment} tests completed.`);
+        this.gf.execution.testMode = false;
+    }
 }

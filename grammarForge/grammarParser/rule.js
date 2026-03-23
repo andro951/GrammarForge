@@ -229,6 +229,16 @@ GrammarForge.Rule = class Rule {
                 }
 
                 break;
+            case 'print': {
+                    const [ expIndex ] = this.getNonTerminalIndices(exec, expression, ['exp'], tag);
+                    if (expIndex !== 0)
+                        throw new Error(`For the print tag, the expression must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
+
+                    const defaultFunc = exec.defaultExecFunctions.get("print");
+                    func = (exp) => defaultFunc(exp);
+                }
+
+                break;
             case 'declare': {
                     const metadata = expression.metadata;
                     if (metadata.length > 1) {
