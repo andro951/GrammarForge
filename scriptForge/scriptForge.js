@@ -47,6 +47,7 @@ const ScriptForge = class ScriptForge {
         this.exceededMaxCallStackSize = false;
         this.disableTryCatch = disableTryCatch;
         this.logExecutionTime = logExecutionTime;
+        this.timeUsedOnLogging = 0;
     }
     executingScript = () => {
         return this.scriptCallStack[this.scriptCallStack.length - 1];
@@ -215,6 +216,11 @@ const ScriptForge = class ScriptForge {
         if (!script.enabled)
             return;
 
+        if (this.scriptCallStack.length === 0)
+            this.timeUsedOnLogging = 0;
+
+        const timeUsedOnLoggingAtStart = this.timeUsedOnLogging;
+
         if (this.scriptCallStack.length >= this.maxCallStackSize) {
             this.exceededMaxCallStackSize = true;
         }
@@ -254,12 +260,18 @@ const ScriptForge = class ScriptForge {
 
         const tryFunc = () => {
             const startTime = performance.now();
-            this.gf.exec(script.ast, argsMap, this.allGettersFunctions);
+            this.gf.exec(script.ast, argsMap, this.allGettersFunctions, false);
             const endTime = performance.now();
-            const executionTime = endTime - startTime;
+            this.gf.execution.tryPrintStoredLogsToConsole();
+            const afterLoggingTime = performance.now();
+            const executionTime = endTime - startTime - (this.timeUsedOnLogging - timeUsedOnLoggingAtStart);
+            this.timeUsedOnLogging += afterLoggingTime - endTime;
             if (this.logExecutionTime) {
                 console.log(`Script ${script.key} executed in ${executionTime}ms.`);
             }
+
+            if (executionTime < 0)
+                throw new Error(`Script ${script.key} execution time was calculated to be negative (${executionTime}ms).  This is likely a bug in ScriptForge's execution time tracking.  Please report this to the developer. timeUsedOnLoggingAtStart: ${timeUsedOnLoggingAtStart}, timeUsedOnLogging: ${this.timeUsedOnLogging}, startTime: ${startTime}, endTime: ${endTime}, afterLoggingTime: ${afterLoggingTime}`);
 
             if (executionTime > script.maxExecutionTime)
                 throw new Error(`Script ${script.key} took ${executionTime}ms to execute, which exceeds the maximum execution time of ${script.maxExecutionTime}ms. This can be increased by setting the MetaData tag, MaxExecutuinTime, but consider trying to make the script smaller or faster.`);

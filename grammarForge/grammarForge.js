@@ -152,8 +152,8 @@ const GrammarForge = class GrammarForge {
         return this.parser.parse(str);
     }
 
-    exec = (ast, variables = null, variableGetters = null) => {
-        return this.execution.exec(ast, variables, variableGetters);
+    exec = (ast, variables = null, variableGetters = null, printToConsole = true) => {
+        return this.execution.exec(ast, variables, variableGetters, printToConsole);
     }
 
     replaceOpFunction = (opTag, func) => {

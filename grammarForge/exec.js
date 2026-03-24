@@ -185,7 +185,14 @@
             Object.freeze(this.ruleTagLookup);
         }
 
-        exec = (ast, variables = null, variableGetters = null) => {
+        tryPrintStoredLogsToConsole = () => {
+            if (this.printArr.length > 0) {
+                console.log(this.printArr.join("\n"));
+                this.printArr.length = 0;
+            }
+        }
+
+        exec = (ast, variables = null, variableGetters = null, printToConsole = true) => {
             if (variables === null) {
                 variables = new Map();
             }
@@ -202,10 +209,8 @@
             this.variableGetters = variableGetters;
             this.printArr.length = 0;
             const result = this.execute(ast);
-            if (this.printArr.length > 0) {
-                console.log(this.printArr.join("\n"));
-                this.printArr.length = 0;
-            }
+            if (printToConsole)
+                this.tryPrintStoredLogsToConsole();
 
             this.variables = null;
             this.variableGetters = null;
