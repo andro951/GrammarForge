@@ -125,12 +125,12 @@ GrammarForge.Expression = class Expression {
         }
         else {
             let result = originalResult;
-            if (this.automaticallyGeneratedFunc && this.nonTerminalIndexs !== undefined && this.nonTerminalIndexs.length > 0) {
-                if (this.nonTerminalIndexs.length === 1) {
-                    result = originalResult[this.nonTerminalIndexs[0]];
+            if (this.keptWordIndexes.length > 0) {
+                if (this.keptWordIndexes.length === 1) {
+                    result = originalResult[this.keptWordIndexes[0]];
                 }
                 else {
-                    result = this.nonTerminalIndexs.map(i => originalResult[i]);
+                    result = this.keptWordIndexes.map(i => originalResult[i]);
                 }
 
                 //console.log(`${originalResult} -> ${result}`);
@@ -165,13 +165,13 @@ GrammarForge.Expression = class Expression {
                                         throw new Error("Expected an ExpNode result for statement list expression with 1 statement, but got: " + firstWordResult);
 
                                     if (result.length < 2)
-                                        throw new Error("Expected at least 2 statements in statement list for it to be a + or * expression, but got: " + nonTerminalWordResult);
+                                        throw new Error("Expected at least 2 statements in statement list for it to be a + or * expression, but got: " + keptWordWordResult);
 
                                     return new GrammarForge.ExpNode(this, result);
                                 }
                                 else {
                                     if (!(result instanceof GrammarForge.ExpNode))
-                                        throw new Error("Expected an ExpNode result for statement list expression with 1 statement, but got: " + nonTerminalWordResult);
+                                        throw new Error("Expected an ExpNode result for statement list expression with 1 statement, but got: " + keptWordWordResult);
 
                                     return result;
                                 }
@@ -349,44 +349,53 @@ GrammarForge.Expression = class Expression {
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    setNonTerminalIndexs = (containsOptional) => {
-        let count = 0;
-        if (this.nonTerminalIndexs !== undefined) {
-            for (let i = 0; i < this.nonTerminalIndexs.length; i++) {
-                const word = this.words[this.nonTerminalIndexs[i]];
-                let wordCount = word.setNonTerminalIndexs(containsOptional);
-                if (wordCount <= 0)
-                    throw new Error("Expected to find at least 1 non-terminal in word: " + word.toString());
+    setKeptWordIndexs(parser) {
+        if (this.keptWordIndexes !== undefined) {
+            if (this.gettingCheckedForKeptWordIndexes)
+                return 1;//Indicates recursion.
 
-                count += wordCount;
-            }
+            return this.keptWordIndexes.length;
         }
-        else {
-            this.nonTerminalIndexs = [];
+        
+        this.gettingCheckedForKeptWordIndexes = true;
+
+        this.keptWordIndexes = [];
+
+        
+        let count = 0;
+        if (this.tag !== null && GrammarForge.Expression.operatorTagPrecedence.has(this.tag)) {
             for (let i = 0; i < this.words.length; i++) {
                 const word = this.words[i];
-                let wordCount = word.setNonTerminalIndexs(containsOptional);
+                word.setKeptWordIndexs(parser);
+                this.keptWordIndexes.push(i);
+            }
+
+            count = this.keptWordIndexes.length;
+        }
+        else {
+            for (let i = 0; i < this.words.length; i++) {
+                const word = this.words[i];
+                let wordCount = word.setKeptWordIndexs(parser);
                 if (wordCount > 0) {
                     count += wordCount;
-                    this.nonTerminalIndexs.push(i);
+                    this.keptWordIndexes.push(i);
                 }
             }
         }
 
+        delete this.gettingCheckedForKeptWordIndexes;
+
         return count;
     }
 
-    getNonTerminalsFromIndexs = (containsOptional) => {
-        if (this.nonTerminalIndexs === undefined)
-            this.setNonTerminalIndexs(containsOptional);
-
-        const nonTerminals = [];
-        for (let i = 0; i < this.nonTerminalIndexs.length; i++) {
-            const word = this.words[this.nonTerminalIndexs[i]];
-            nonTerminals.push(...word.getNonTerminalsFromIndexs(containsOptional));
+    getKeptWordsFromIndexs = (containsOptional = false) => {
+        const keptWords = [];
+        for (let i = 0; i < this.keptWordIndexes.length; i++) {
+            const word = this.words[this.keptWordIndexes[i]];
+            keptWords.push(...word.getKeptWordsFromIndexs(containsOptional));
         }
 
-        return nonTerminals;
+        return keptWords;
     }
 
     getChildren = (parser, childrenIndexSet) => {

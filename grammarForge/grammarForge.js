@@ -22,16 +22,16 @@ RuleDefinitions are one or more Expressions separated by '|' to indicate alterna
 Expressions are one or more Words separated by whitespace.
 Words are Symbols, Tokens, names of Rules, or grouped Expressions in parentheses.
 Example of a Rule Definition:
-    func : NAME \( (expr (',' expr)*)? \)
+    func : NAME LPAREN expr... RPAREN
     Rule name: 'func'
-    1 Rule expressions: [ "NAME \( (expr (',' expr)*)? \)" ]
-    4 Expression words: [ "NAME", "(", "(expr (',' expr)*)?", ")" ]
-    The 3rd word is an Expression group in parentheses which can contian multiple words.
+    1 Rule expressions: [ "NAME LPAREN expr... RPAREN" ]
+    4 Expression words: [ "NAME", "LPAREN", "expr...", "RPAREN" ]
+    The 3rd word is an Expression list seperated by commas which can contain multiple words.
 
 In the rule definition, the collon can be ':', ':=' or '::='.
 Symbols used in rule definitions:
-    '(', ')', '*', '+', '?', '|', '{', '}'
-Do use these symbols in your grammar, you must escape them with a backslash '\' as seen above.
+    '(', ')', '*', '+', '?', '|', '{', '}', '...', ':', ':=', '::='
+To use these symbols in your grammar, you must use a token definition instead and use the token in your grammar.
 
 
 
@@ -43,13 +43,16 @@ Do use these symbols in your grammar, you must escape them with a backslash '\' 
     ruleName : ruleDefinition1
              | ruleDefinition2
 (symbol)? indicates that symbol is optional.  Example:
-    ruleName : ruleDefinition1 (symbol)?
+    ruleName : (symbol)?
 
 (symbol)* indicates that symbol can appear zero or more times.  Example:
-    ruleName : ruleDefinition1 (symbol)*
+    ruleName : (symbol)*
 
 (symbol)+ indicates that symbol can appear one or more times.  Example:
-    ruleName : ruleDefinition1 (symbol)+
+    ruleName : (symbol)+
+
+(symbol)... indicates that symbol is an expression list separated by commas.  Example:
+    ruleName : (symbol)...
 
 Uppercase names are tokens (terminal symbols).
 Lowercase names are rules (non-terminal symbols).
@@ -66,18 +69,36 @@ To show that a type needs to be parsed, put the tag after the regex.  Example:
 Supported tags:
 int - integer
 float - floating point number
+string - string
 IGNORE - ignore this token (do not include it in the token stream)
 
 Default tokens always added:
+COMMA, /,/ is added at the end to support expression lists. (Added so that delimited lists with ... have a default delimiter.)
 WHITESPACE, /\s+/ (IGNORE) is added at the end to ignore whitespace.
+SYMBOL, /[^a-zA-Z0-9_\s:|()*+?'"\`;]/ is added at the end to match most symbols not used in grammar definitions. (You can use 
+    these directly in your grammer instead of a token if desired.)
 UNKNOWN, /./ is added at the very end and throws an error if no other token matches.
 */
 
 const GrammarForge = class GrammarForge {
-    constructor(grammar, functions, tokenDefinitions) {
+    constructor(grammar, functions = null, tokenDefinitions = null) {
+        if (typeof grammar !== 'string')
+            throw new Error("Grammar must be a string.");
+
+        if (functions === null)
+            functions = [];
+
+        if (!Array.isArray(functions) || !functions.every(f => f instanceof GrammarForge.RuleFunctionDefinition))
+            throw new Error("Functions must be an array of RuleFunctionDefinition instances or null.");
+
+        if (tokenDefinitions !== null) {
+            if (!Array.isArray(tokenDefinitions) || !tokenDefinitions.every(td => td instanceof GrammarForge.TokenDefinition))
+                throw new Error("Token definitions must be an array of GrammarForge.TokenDefinition instances or null.");
+        }
+
         this.grammar = grammar;
-        this.argTokenDefinitions = tokenDefinitions;
         this.functions = functions;
+        this.argTokenDefinitions = tokenDefinitions;
         this.setup();
     }
 
@@ -166,6 +187,10 @@ const GrammarForge = class GrammarForge {
 
         console.log(`All ${testEnvironment} tests completed.`);
         this.execution.testMode = false;
+    }
+
+    setParseTokenFunction = (tokenTag, func) => {
+        this.parser.setParseTokenFunction(tokenTag, func);
     }
 };
 

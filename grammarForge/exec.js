@@ -42,6 +42,8 @@
             }
             else if (word instanceof GrammarForge.QWord) {
                 this.markExpressionsInWordAsNotAutomaticallyGenerated(word.word);
+                if (word.delimiterWord)
+                    this.markExpressionsInWordAsNotAutomaticallyGenerated(word.delimiterWord);
             }
             else {
                 throw new Error(`Unexpected word type in markExpressionsInWordAsAutomaticallyGenerated: ${word.constructor.name}`);
@@ -58,17 +60,20 @@
         createExecFunctions = (functions) => {
             //Populate execFunctions from user functions
             if (functions) {
-                for (const [ruleName, exprMap] of functions) {
+                for (const funcDef of functions) {
+                    if (!(funcDef instanceof GrammarForge.RuleFunctionDefinition))
+                        throw new Error(`Functions array must contain only RuleFunctionDefinition instances.  Found: ${funcDef.constructor.name}`);
+
+                    const ruleName = funcDef.ruleName;
                     const ruleExpressionMap = this.expressionByRuleNameThenExpressionStringLookup.get(ruleName);
                     if (ruleExpressionMap) {
-                        for (const [expressionString, func] of exprMap) {
-                            const expression = ruleExpressionMap.get(expressionString);
-                            if (expression === undefined)
-                                throw new Error(`No expression found with string: ${expressionString} in rule: ${ruleName}`);
+                        const expressionString = funcDef.expressionString;
+                        const expression = ruleExpressionMap.get(expressionString);
+                        if (expression === undefined)
+                            throw new Error(`No expression found with string: ${expressionString} in rule: ${ruleName}`);
 
-                            expression.execFunc = func;
-                            this.markAsNotAutomaticallyGenerated(expression);
-                        }
+                        expression.execFunc = funcDef.func;
+                        this.markAsNotAutomaticallyGenerated(expression);
                     }
                     else {
                         throw new Error(`No rule found with name: ${ruleName} for user-defined exec function.`);
@@ -104,17 +109,17 @@
                     const rule = this.parser.rules[i];
                     for (let j = 0; j < rule.expList.expressions.length; j++) {
                         const expr = rule.expList.expressions[j];
-                        const nonTerminals = expr.getNonTerminalsFromIndexs();
-                        if (nonTerminals.length === 1) {
-                            const exprNonTerminalIndexes = expr.nonTerminalIndexs;
-                            const nonTerminalIndex = exprNonTerminalIndexes[0];
-                            const word = expr.words[nonTerminalIndex];
+                        const keptWords = expr.getKeptWordsFromIndexs();
+                        if (keptWords.length === 1) {
+                            const exprKeptWordIndexes = expr.keptWordIndexes;
+                            const keptWordIndex = exprKeptWordIndexes[0];
+                            const word = expr.words[keptWordIndex];
                             if (word instanceof GrammarForge.QWord && (word.oType === "PLUS" || word.oType === "STAR")) {
-                                const nonTerminalWord = nonTerminals[0];
-                                if (!(nonTerminalWord instanceof GrammarForge.Term))
+                                const keptWordWord = keptWords[0];
+                                if (!(keptWordWord instanceof GrammarForge.Term))
                                     continue;
 
-                                if (nonTerminalWord.type !== "IDENTIFIER" || nonTerminalWord.value !== this.stmt_rule.name)
+                                if (keptWordWord.type !== "IDENTIFIER" || keptWordWord.value !== this.stmt_rule.name)
                                     continue;
 
                                 foundCount++;
@@ -149,9 +154,9 @@
                 let found = false;
                 for (let j = 0; j < this.stmt_rule.expList.expressions.length; j++) {
                     const expr = this.stmt_rule.expList.expressions[j];
-                    const nonTerminals = expr.getNonTerminalsFromIndexs();
-                    if (nonTerminals.length === 1) {
-                        const word = nonTerminals[0];
+                    const keptWords = expr.getKeptWordsFromIndexs();
+                    if (keptWords.length === 1) {
+                        const word = keptWords[0];
                         if (word instanceof GrammarForge.Term && word.type === "IDENTIFIER") {
                             const rule = this.getRule(word.value);
                             if (!rule)
@@ -582,23 +587,10 @@
                     const value = exp.exec();
                     return new GrammarForge.ReturnControl(value);
                 }],
-                ['func_declare', (var_, optional, block) => {
+                ['func_declare', (var_, parametersArr, block) => {
                     const v = var_.exec();
                     
-                    const parameters = [];
-                    if (Array.isArray(optional)) {
-                        //TODO: This assumes a structure of (first, (COMMA, exp)*)
-                        //Should make it more generic.  Probably generating a collecting function 
-                        // and passing it as an arguemnt to this function.
-                        const [first, rest] = optional;
-                        const firstParam = first.exec();
-                        parameters.push(firstParam);
-                        parameters.push(...rest.map((exp) => exp.exec()));
-                    }
-                    else {
-                        if (!optional.empty)
-                            throw new Error(`Function declaration optional node must be empty or an array.`);
-                    }
+                    const parameters = parametersArr.map((param) => param.exec());
 
                     const val = new GrammarForge.FunctionDeclaration(
                         v,
@@ -615,27 +607,13 @@
 
                     return GrammarForge.NORMAL_CONTROL;
                 }],
-                ['func_call', (var_, optional) => {
+                ['func_call', (var_, argsArr) => {
                     const v = var_.exec();
                     const func = execution.get_variable(v);
                     if (!(func instanceof GrammarForge.FunctionDeclaration))
                         throw new Error(`Tried to call vairable as a function, but it is not a function: ${v}, type: ${type}, value: ${func}`);
 
-                    let args;
-                    if (Array.isArray(optional)) {
-                        //TODO: This assumes a structure of (first, (COMMA, exp)*)
-                        //Should make it more generic.  Probably generating a collecting function 
-                        // and passing it as an arguemnt to this function.
-                        const [first, rest] = optional;
-                        const firstArg = first.exec();
-                        args = [firstArg, ...rest.map((exp) => exp.exec())];
-                    }
-                    else {
-                        if (!optional.empty)
-                            throw new Error(`Function call optional node must be empty or an array.`);
-
-                        args = [];
-                    }
+                    let args = argsArr.map(arg => arg.exec());
 
                     const result = func.call(args);
 
@@ -712,7 +690,7 @@
                     if (!(word instanceof GrammarForge.Term))
                         throw new Error(`Expression tagged as ${tag} must contain exactly one operator token.  Expression: ${expression.expressionString} in rule: ${this.name}`);
 
-                    if (word.type !== 'TOKEN' && word.type !== 'MATH_SYMBOL' && word.type !== 'PLUS' && word.type !== 'STAR')
+                    if (word.type !== 'TOKEN' && word.type !== 'MATH_SYMBOL' && word.type !== 'TAG_OPEN' && word.type !== 'TAG_CLOSE' && word.type !== 'PLUS' && word.type !== 'STAR')
                         throw new Error(`Expression tagged as ${tag} must contain exactly one operator token.  Expression: ${expression.expressionString} in rule: ${this.name}`);
 
                     if (!GrammarForge.Expression.operatorTagPrecedence.has(tag))

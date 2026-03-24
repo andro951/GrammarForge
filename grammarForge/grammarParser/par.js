@@ -35,12 +35,12 @@ GrammarForge.Par = class Par extends GrammarForge.Word {
         return this.expList.getTryParseFunc(parser);
     }
 
-    setNonTerminalIndexs = (containsOptional) => {
-        return this.expList.setNonTerminalIndexs(containsOptional);
+    setKeptWordIndexs = (parser) => {
+        return this.expList.setKeptWordIndexs(parser);
     }
 
-    getNonTerminalsFromIndexs = (containsOptional) => {
-        return this.expList.getNonTerminalsFromIndexs(containsOptional);
+    getKeptWordsFromIndexs = (containsOptional = false) => {
+        return this.expList.getKeptWordsFromIndexs(containsOptional);
     }
 
     getChildren = (parser, childrenIndexSet) => {

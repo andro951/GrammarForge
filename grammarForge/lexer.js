@@ -10,6 +10,7 @@
             this.tokenDefinitions = tokenDefinitions;
             this.index = 0;
             this.tokens = [];
+            this.tokenDefinitions.push(new TokenDefinition("COMMA", /,/));
             this.tokenDefinitions.push(new TokenDefinition("WHITESPACE", /\s+/, 'IGNORE'));
             this.tokenDefinitions.push(new TokenDefinition("SYMBOL", /[^a-zA-Z0-9_\s:|()*+?'"\`;]/));
             this.tokenDefinitions.push(new TokenDefinition("UNKNOWN", /./));

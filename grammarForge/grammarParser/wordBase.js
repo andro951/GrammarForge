@@ -15,11 +15,11 @@ GrammarForge.WordBase = class WordBase {
         throw new Error("Not implemented");
     }
 
-    setNonTerminalIndexs = (containsOptional) => {
+    setKeptWordIndexs = (parser) => {
         throw new Error("Not implemented");
     }
 
-    getNonTerminalsFromIndexs = (containsOptional) => {
+    getKeptWordsFromIndexs = (containsOptional = false) => {
         throw new Error("Not implemented");
     }
 

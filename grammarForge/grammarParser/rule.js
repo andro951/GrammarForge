@@ -152,7 +152,7 @@ GrammarForge.Rule = class Rule {
             let func = null;
             switch (tag) {
                 case 'block': {
-                        const [ stmtListIndex ] = this.getNonTerminalIndices(exec, expression, ['sl'], tag);
+                        const [ stmtListIndex ] = this.getTaggedWordIndices(exec, expression, ['sl'], tag);
                         if (stmtListIndex !== 0)
                             throw new Error(`For the block tag, the stmt list must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -162,7 +162,7 @@ GrammarForge.Rule = class Rule {
 
                     break;
                 case 'sl': {
-                        const [ stmtIndex ] = this.getNonTerminalIndices(exec, expression, ['stmt'], tag);
+                        const [ stmtIndex ] = this.getTaggedWordIndices(exec, expression, ['stmt'], tag);
                         if (stmtIndex !== 0)
                             throw new Error(`For the sl tag, the stmt must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
                         
@@ -196,21 +196,21 @@ GrammarForge.Rule = class Rule {
         let func = null;
         switch (tag) {
             case 'while': {
-                    const [ expIndex, stmtIndex ] = this.getNonTerminalIndices(exec, expression, ['exp', 'stmt'], tag);
+                    const [ expIndex, stmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt'], tag);
                     
                     const defaultFunc = exec.defaultExecFunctions.get("while");
                     func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex]);
                 }
                 break;
             case 'foreach' : {
-                    const [ varIndex, expIndex, stmtIndex ] = this.getNonTerminalIndices(exec, expression, ['var', 'exp', 'stmt'], tag);
+                    const [ varIndex, expIndex, stmtIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'exp', 'stmt'], tag);
                     
                     const defaultFunc = exec.defaultExecFunctions.get("foreach");
                     func = (arr) => defaultFunc(arr[varIndex], arr[expIndex], arr[stmtIndex]);
                 }
                 break;
             case 'assign': {
-                    const [ varIndex, expIndex ] = this.getNonTerminalIndices(exec, expression, ['var', 'exp'], tag);
+                    const [ varIndex, expIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'exp'], tag);
 
                     let defaultFunc;
                     const metadata = expression.metadata;
@@ -230,7 +230,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'print': {
-                    const [ expIndex ] = this.getNonTerminalIndices(exec, expression, ['exp'], tag);
+                    const [ expIndex ] = this.getTaggedWordIndices(exec, expression, ['exp'], tag);
                     if (expIndex !== 0)
                         throw new Error(`For the print tag, the expression must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -247,14 +247,14 @@ GrammarForge.Rule = class Rule {
                             throw new Error(`Expression has a tag with unrecognized info: ${tagInfo}.  The only supported info for declare is 'no_value'.  expression: ${expression.expressionString} in rule: ${this.name}, tag: ${metadata.join(" ")}`);
 
                         const defaultFunc = exec.defaultExecFunctions.get("declare no_value");
-                        const [ varIndex ] = this.getNonTerminalIndices(exec, expression, ['var'], tag);
+                        const [ varIndex ] = this.getTaggedWordIndices(exec, expression, ['var'], tag);
                         if (varIndex !== 0)
                             throw new Error(`For the declare tag with no_value, the variable must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
 
                         func = (varName) => defaultFunc(varName);
                     }
                     else {
-                        const [ varIndex, expIndex ] = this.getNonTerminalIndices(exec, expression, ['var', 'exp'], tag);
+                        const [ varIndex, expIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'exp'], tag);
                         const defaultFunc = exec.defaultExecFunctions.get("declare");
                         func = (arr) => defaultFunc(arr[varIndex], arr[expIndex]);
                     }
@@ -263,7 +263,7 @@ GrammarForge.Rule = class Rule {
                 break;
             case 'get': {
                     const defaultFunc = exec.defaultExecFunctions.get("get");
-                    const [ varIndex ] = this.getNonTerminalIndices(exec, expression, ['var'], tag);
+                    const [ varIndex ] = this.getTaggedWordIndices(exec, expression, ['var'], tag);
                     if (varIndex !== 0)
                         throw new Error(`For the get tag, the variable must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -272,7 +272,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'par': {
-                    const [ expIndex ] = this.getNonTerminalIndices(exec, expression, ['exp'], tag);
+                    const [ expIndex ] = this.getTaggedWordIndices(exec, expression, ['exp'], tag);
                     if (expIndex !== 0)
                         throw new Error(`For the par tag, the expression must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -282,7 +282,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'break': {
-                    const empty = this.getNonTerminalIndices(exec, expression, [], tag);
+                    const empty = this.getTaggedWordIndices(exec, expression, [], tag);
 
                     const defaultFunc = exec.defaultExecFunctions.get("break");
                     func = () => defaultFunc();
@@ -290,7 +290,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'continue': {
-                    const empty = this.getNonTerminalIndices(exec, expression, [], tag);
+                    const empty = this.getTaggedWordIndices(exec, expression, [], tag);
 
                     const defaultFunc = exec.defaultExecFunctions.get("continue");
                     func = () => defaultFunc();
@@ -299,7 +299,7 @@ GrammarForge.Rule = class Rule {
                 break;
             case 'return': {
                     try {
-                        const [ optionalIndex ] = this.getNonTerminalIndices(exec, expression, ['optional'], tag);
+                        const [ optionalIndex ] = this.getTaggedWordIndices(exec, expression, ['optional'], tag);
                         if (optionalIndex !== 0)
                             throw new Error(`For the return tag with an optional expression, the optional must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -308,7 +308,7 @@ GrammarForge.Rule = class Rule {
                     }
                     catch (e) {
                         if (e.message.startsWith("No optional non-terminal found")) {
-                            const [ expIndex ] = this.getNonTerminalIndices(exec, expression, ['exp'], tag);
+                            const [ expIndex ] = this.getTaggedWordIndices(exec, expression, ['exp'], tag);
                             if (expIndex !== 0)
                                 throw new Error(`For the return tag, the expression must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -323,7 +323,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'func_declare': {
-                    const [ varIndex, optionalIndex, blockIndex ] = this.getNonTerminalIndices(exec, expression, ['var', 'optional', 'block'], tag);
+                    const [ varIndex, optionalIndex, blockIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'optional', 'block'], tag);
 
                     const defaultFunc = exec.defaultExecFunctions.get("func_declare");
                     func = (arr) => defaultFunc(arr[varIndex], arr[optionalIndex], arr[blockIndex]);
@@ -331,7 +331,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'func_call': {
-                    const [ varIndex, optionalIndex ] = this.getNonTerminalIndices(exec, expression, ['var', 'optional'], tag);
+                    const [ varIndex, optionalIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'optional'], tag);
 
                     const defaultFunc = exec.defaultExecFunctions.get("func_call");
                     func = (arr) => defaultFunc(arr[varIndex], arr[optionalIndex]);
@@ -339,7 +339,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'if' : {
-                    const [ expIndex, stmtIndex, elseStmtIndex ] = this.getNonTerminalIndices(exec, expression, ['exp', 'stmt', 'stmt'], tag);
+                    const [ expIndex, stmtIndex, elseStmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt', 'stmt'], tag);
 
                     const defaultFunc = exec.defaultExecFunctions.get("if");
                     func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex], arr[elseStmtIndex]);
@@ -371,37 +371,37 @@ GrammarForge.Rule = class Rule {
         });
     }
 
-    validateNonTerminalsCount(nonTerminals, rules, tag, expression) {
-        if (nonTerminals.length !== rules.length)
-            throw new Error(`Found a ${tag} tag on expression: ${expression.expressionString}, but ${tag} requires exactly ${rules.length} non-terminals. Found ${nonTerminals.length}`);
+    validateKeptWordsCount(keptWords, rules, tag, expression) {
+        if (keptWords.length !== rules.length)
+            throw new Error(`Found a ${tag} tag on expression: ${expression.expressionString}, but ${tag} requires exactly ${rules.length} non-terminals. Found ${keptWords.length}`);
     }
 
-    assignIndices(nonTerminals, rules, tag, expression) {
+    assignIndices(keptWords, rules, tag, expression) {
         const indices = Array(rules.length).fill(-1);
-        const nonTerminalUsed = Array(nonTerminals.length).fill(false);
+        const keptWordUsed = Array(keptWords.length).fill(false);
         for (let i = 0; i < rules.length; i++) {
             const rule = rules[i];
-            for (let j = 0; j < nonTerminals.length; j++) {
-                if (nonTerminalUsed[j])
+            for (let j = 0; j < keptWords.length; j++) {
+                if (keptWordUsed[j])
                     continue;
 
                 if (rule.name === 'optional') {
-                    if (!Array.isArray(nonTerminals[j]))
+                    if (!Array.isArray(keptWords[j]))
                         continue;
 
-                    const [ qWord, words ] = nonTerminals[j];
+                    const [ qWord, words ] = keptWords[j];
                     if (!(qWord instanceof GrammarForge.QWord))
                         throw new Error(`Found a ${tag} tag with an optional non-terminal, but the non-terminal is not a QWord: ${expression.expressionString}`);
 
-                    if (qWord.oType !== 'QUESTION')
-                        throw new Error(`Found a ${tag} tag with an optional non-terminal, but the QWord is not a QUESTION: ${expression.expressionString}`);
+                    if (qWord.oType !== 'QUESTION' && qWord.oType !== 'ELLIPSIS')
+                        throw new Error(`Found a ${tag} tag with an optional non-terminal, but the QWord is not a QUESTION or ELLIPSIS: ${expression.expressionString}`);
 
                     indices[i] = j;
-                    nonTerminalUsed[j] = true;
+                    keptWordUsed[j] = true;
                     break;
                 }
                 else {
-                    const word = nonTerminals[j];
+                    const word = keptWords[j];
                     if (!(word instanceof GrammarForge.Term))
                         continue;
 
@@ -410,7 +410,7 @@ GrammarForge.Rule = class Rule {
 
                     if (rule.name === word.value) {
                         indices[i] = j;
-                        nonTerminalUsed[j] = true;
+                        keptWordUsed[j] = true;
                         break;
                     }
                 }
@@ -421,14 +421,14 @@ GrammarForge.Rule = class Rule {
             if (indices[i] === -1)
                 throw new Error(`No ${rules[i].name} non-terminal found: ${expression.expressionString}`);
 
-            if (!nonTerminalUsed[i])
+            if (!keptWordUsed[i])
                 throw new Error(`Non-terminal for rule ${rules[i].name} was not used: ${expression.expressionString}`);
         }
 
         return indices;
     }
 
-    getNonTerminalIndices(exec, expression, rulesTags, tag) {
+    getTaggedWordIndices(exec, expression, rulesTags, tag) {
         const rules = this.getRulesFromTags(exec, rulesTags, tag, expression);
         let containsOptional = false;
         for (const rule of rules) {
@@ -438,9 +438,9 @@ GrammarForge.Rule = class Rule {
             }
         }
 
-        const nonTerminals = expression.getNonTerminalsFromIndexs(containsOptional);
-        this.validateNonTerminalsCount(nonTerminals, rules, tag, expression);
-        return this.assignIndices(nonTerminals, rules, tag, expression);
+        const keptWords = expression.getKeptWordsFromIndexs(containsOptional);
+        this.validateKeptWordsCount(keptWords, rules, tag, expression);
+        return this.assignIndices(keptWords, rules, tag, expression);
     }
 
     tryMakeDefaultExpExecFunc = (exec, expressionIndex) => {
@@ -451,7 +451,7 @@ GrammarForge.Rule = class Rule {
         if (expression.tag !== null)
             return;
 
-        const hasExecFunc = expression.execFunc !== null;
+        const hasExecFunc = expression.execFunc !== null;// || expression.requiredArgIndexes !== undefined;
         if (expression.words.length === 0) {
             throw new Error(`Found an exp rule with an empty expression in rule: ${this.name}, expression: ${expression.expressionString}.  exp rules must have at least one word.`);
         }
@@ -901,6 +901,14 @@ GrammarForge.Rule = class Rule {
         else {
             throw new Error(`Not implemented`);
         }
+    }
+
+    setKeptWordIndexs = (parser) => {
+        return this.expList.setKeptWordIndexs(parser);
+    }
+
+    getKeptWordsFromIndexs = (containsOptional = false) => {
+        return this.expList.getKeptWordsFromIndexs(containsOptional);
     }
 
     getChildren = (parser, childrenIndexSet) => {

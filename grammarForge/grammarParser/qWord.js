@@ -1,19 +1,23 @@
 "use strict";
 
 GrammarForge.QWord = class QWord extends GrammarForge.Word {
-    constructor(word, oType) {
+    constructor(word, oType, delimiterWord = null) {
         if (!(word instanceof GrammarForge.Word))
             throw new Error(`QWord constructor: word must be an instance of GrammarForge.Word.`);
-
-        if (word instanceof GrammarForge.QWord)
-            throw new Error(`QWord constructor: word cannot be a QWord.`);
 
         if (!oType)
             throw new Error(`QWord constructor: oType is required and can't be null.`);
 
+        if (delimiterWord !== null && !(delimiterWord instanceof GrammarForge.Word) || delimiterWord instanceof GrammarForge.QWord)
+            throw new Error(`QWord constructor: delimiterWord must be an instance of GrammarForge.Word or null.`);
+
+        if (delimiterWord !== null && oType !== 'ELLIPSIS')
+            throw new Error(`QWord constructor: delimiterWord is only allowed with ELLIPSIS oType.`);
+
         super();
         this.word = word;
         this.oType = oType;
+        this.delimiterWord = delimiterWord;
         this.qWordString = this.toString();
     }
 
@@ -22,7 +26,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
     //Returns false if this word was not a match, but is optional
     checkWordForLeftRecursion = (parser, expr, lookAheadSet) => {
         const checked = this.word.checkWordForLeftRecursion(parser, expr, lookAheadSet);
-        if (checked && this.oType === 'PLUS')
+        if (checked && (this.oType === 'PLUS' || this.oType === 'ELLIPSIS'))
             return true;
 
         return false;
@@ -36,6 +40,8 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                 return "*";
             case "PLUS":
                 return "+";
+            case "ELLIPSIS":
+                return `...${this.delimiterWord ? `<${this.delimiterWord.toString()}>` : ''}`;
             default:
                 throw new Error(`QWord oTypeToString: Unknown oType ${oType}`);
         }
@@ -96,7 +102,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                         func = (tokenStream) => {
                             const result = [];
                             const clonedStream = tokenStream.clone();
-                            while (true) {
+                            for(;;) {
                                 if (tokenStream.end())
                                     break;
 
@@ -122,7 +128,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                             const firstWordResult = wordParseFunc(tokenStream);
                             result.push(firstWordResult);
                             const clonedStream = tokenStream.clone();
-                            while (true) {
+                            for(;;) {
                                 if (tokenStream.end())
                                     break;
 
@@ -137,6 +143,38 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                             }
 
                             return this._getResult(result, parser);
+                        }
+                    }
+                    break;
+                case "ELLIPSIS": {
+                        const wordTryParseFunc = this.word.getTryParseFunc(parser);
+                        const delimiterTryParseFunc = this.delimiterWord ? this.delimiterWord.getTryParseFunc(parser) : this.getCommaTryParseFunc(parser);
+                        func = (tokenStream) => {
+                            const result = [];
+                            const clonedStream = tokenStream.clone();
+                            const firstWordResult = wordTryParseFunc(clonedStream);
+                            if (!firstWordResult)
+                                return result;
+
+                            result.push(firstWordResult);
+                            tokenStream.index = clonedStream.index;
+                            for(;;) {
+                                if (tokenStream.end())
+                                    break;
+
+                                const delimiterResult = delimiterTryParseFunc(clonedStream);
+                                if (!delimiterResult)
+                                    break;
+
+                                const wordResult = wordTryParseFunc(clonedStream);
+                                if (!wordResult)
+                                    break;
+
+                                tokenStream.index = clonedStream.index;
+                                result.push(wordResult);
+                            }
+
+                            return result;
                         }
                     }
                     break;
@@ -175,7 +213,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                     tryFunc = (tokenStream) => {
                         const result = [];
                         const clonedStream = tokenStream.clone();
-                        while (true) {
+                        for(;;) {
                             if (tokenStream.end())
                                 break;
 
@@ -202,7 +240,7 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                         const result = [ firstWordResult ];
                         
                         tokenStream.index = clonedStream.index;
-                        while (true) {
+                        for(;;) {
                             if (tokenStream.end())
                                 break;
 
@@ -219,6 +257,37 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
                         return this._getResult(result, parser);
                     }
                     break;
+                case "ELLIPSIS": {
+                        const delimiterTryParseFunc = this.delimiterWord ? this.delimiterWord.getTryParseFunc(parser) : this.getCommaTryParseFunc(parser);
+                        tryFunc = (tokenStream) => {
+                            const result = [];
+                            const clonedStream = tokenStream.clone();
+                            const firstWordResult = wordTryParseFunc(clonedStream);
+                            if (!firstWordResult)
+                                return result;
+
+                            result.push(firstWordResult);
+                            tokenStream.index = clonedStream.index;
+                            for(;;) {
+                                if (tokenStream.end())
+                                    break;
+
+                                const delimiterResult = delimiterTryParseFunc(clonedStream);
+                                if (!delimiterResult)
+                                    break;
+
+                                const wordResult = wordTryParseFunc(clonedStream);
+                                if (!wordResult)
+                                    break;
+
+                                tokenStream.index = clonedStream.index;
+                                result.push(wordResult);
+                            }
+
+                            return result;
+                        }
+                    }
+                    break;
                 default:
                     throw new Error(`Par type ${this.oType} not supported in getParseFunc`);
             }
@@ -229,20 +298,40 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    setNonTerminalIndexs = (containsOptional) => {
-        const nonTerminalsCount = this.word.setNonTerminalIndexs(containsOptional);
-        if (nonTerminalsCount > 0 && containsOptional && this.oType === 'QUESTION')
-            return 1;
-        
-        return nonTerminalsCount;
+    getCommaTryParseFunc = (parser) => {
+        let funcIndex = parser.ruleTrySubFunctionLookup.get('COMMA');
+        if (funcIndex === undefined) {
+            const commaTerm = new GrammarForge.Term({ type: 'TOKEN', value: 'COMMA' });
+            const tryFunc = commaTerm.getTryParseFunc(parser);
+            return tryFunc;
+        }
+
+        return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    getNonTerminalsFromIndexs = (containsOptional) => {
-        const nonTerminals = this.word.getNonTerminalsFromIndexs(containsOptional);
-        if (nonTerminals.length > 0 && containsOptional && this.oType === 'QUESTION')
-            return [ [ this, nonTerminals ] ];
+    setKeptWordIndexs = (parser) => {
+        const keptWordsCount = this.word.setKeptWordIndexs(parser);
+        if (this.oType === 'ELLIPSIS') {
+            if (this.delimiterWord)
+                this.delimiterWord.setKeptWordIndexs(parser);
 
-        return nonTerminals;
+            return 1;
+        }
+        
+        return keptWordsCount;
+    }
+
+    getKeptWordsFromIndexs = (containsOptional = false) => {
+        const keptWords = this.word.getKeptWordsFromIndexs(containsOptional);
+        if (this.oType === 'ELLIPSIS') {
+            const delimiterKeptWords = this.delimiterWord ? this.delimiterWord.getKeptWordsFromIndexs(containsOptional) : undefined;
+            return [ [ this, keptWords, delimiterKeptWords ] ];
+        }
+
+        if (keptWords.length > 0 && containsOptional && this.oType === 'QUESTION')
+            return [ [ this, keptWords ] ];
+
+        return keptWords;
     }
 
     getChildren = (parser, childrenIndexSet) => {

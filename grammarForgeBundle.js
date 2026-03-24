@@ -1,4 +1,4 @@
-const GRAMMAR_FORGE_LIB_VERSION = '2.0.1';
+const GRAMMAR_FORGE_LIB_VERSION = '2.1.0';
 const BASE_URL = 'https://andro951.github.io/GrammarForge/';
 
 const files = [
@@ -28,6 +28,7 @@ const files = [
   'grammarForge/flowControl.js',
   'grammarForge/functionDeclaration.js',
   'grammarForge/programTestCase.js',
+  'grammarForge/ruleFunctionDefinition.js',
   'scriptForge/scriptForge.js',
   'scriptForge/script.js',
   'scriptForge/scriptAction.js',

@@ -7,8 +7,9 @@
             this.lexer = lexer;
             this.tokens = [];
             this.parseTokenFunctions = new Map();
+            this.tokensWithParseFunctions = new Set();
             this.partialAstBeingParsed = null;
-            this.populateParseTokenFunctions();
+            this.populateDefaultParseTokenFunctions();
             this.checkDuplicateRuleNames();
             this.tokenTags = new Map();
             for (let tokenDef of this.lexer.tokenDefinitions) {
@@ -16,6 +17,12 @@
             }
 
             this.createRuleMaps();
+
+            for (const rule of this.rules) {
+                for (const expression of rule.expList.expressions) {
+                    expression.setKeptWordIndexs(this);
+                }
+            }
 
             for (const rule of this.rules) {
                 rule.checkLeftRecursion(this);
@@ -98,10 +105,7 @@
             this.ruleTrySubFunctions = [];
             this.ruleTrySubFunctionKeys = [];
             this.ruleTrySubFunctionLookup = new Map();//Needs to stay as Map<expressionString, subFunctionIndex> because expressions can be either an indexed expression of a rule, or an indexed expression inside parentheses inside another expression.
-            const firstRule = this.rules[0];
-            firstRule.createParseFunctions(this);
-            for (let i = 1; i < this.rules.length; i++) {
-                const rule = this.rules[i];
+            for (const rule of this.rules) {
                 rule.createParseFunctions(this);
             }
         }
@@ -175,44 +179,64 @@
             return this.tokenToAST(token);
         }
 
-        populateParseTokenFunctions = () => {
-            this.parseTokenFunctions = new Map([
-                ['int', (token) => {
-                    const value = parseInt(token.value);
-                    if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER)
-                        throw new Error(`Integer value ${token.value} is out of safe integer range.`);
+        _tryGetDefaultParseTokenFunction = (tokenTag) => {
+            switch (tokenTag) {
+                case 'int':
+                    return (token) => {
+                        const value = parseInt(token.value);
+                        if (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER)
+                            throw new Error(`Integer value ${token.value} is out of safe integer range.`);
 
-                    if (!isFinite(value))
-                        throw new Error(`Invalid integer value: ${token.value}`);
+                        if (!isFinite(value))
+                            throw new Error(`Invalid integer value: ${token.value}`);
 
-                    return value;
-                }],
-                ['float', (token) => {
-                    const value = parseFloat(token.value);
-                    if (!isFinite(value))
-                        throw new Error(`Invalid float value: ${token.value}`);
+                        return value;
+                    };
+                case 'float':
+                    return (token) => {
+                        const value = parseFloat(token.value);
+                        if (!isFinite(value))
+                            throw new Error(`Invalid float value: ${token.value}`);
 
-                    return value;
-                }],
-                ['bool', (token) => token.value === 'true'],
-                ['string', (token) => {
-                    const s = token.value.substring(1, token.value.length - 1);
-                    return s;
-                }],
-                [null, (token) => token.value],
-            ]);
+                        return value;
+                    };
+                case 'bool':
+                    return (token) => token.value === 'true';
+                case 'string':
+                    return (token) => {
+                        const s = token.value.substring(1, token.value.length - 1);
+                        return s;
+                    };
+                default:
+                    return null;
+            }
+        }
+
+        populateDefaultParseTokenFunctions = () => {
+            for (const tokenDef of this.lexer.tokenDefinitions) {
+                const type = tokenDef.type;
+                if (this.parseTokenFunctions.has(type))
+                    continue;
+
+                const tag = tokenDef.tag;
+                if (tag !== null) {
+                    const func = this._tryGetDefaultParseTokenFunction(tag);
+                    if (func) {
+                        this.setParseTokenFunction(type, func);
+                    }
+                }
+            }
+        }
+
+        setParseTokenFunction = (type, func) => {
+            this.parseTokenFunctions.set(type, func);
+            this.tokensWithParseFunctions.add(type);
         }
 
         tokenToAST = (token) => {
-            const tag = this.tokenTags.get(token.type);
-            const parseFunction = this.parseTokenFunctions.get(tag);
-            if (!parseFunction)
-                throw new Error(`No parse function found for token type ${token.type} with tag ${tag}`);
-            
-            const value = parseFunction(token);
-
+            const parseFunction = this.parseTokenFunctions.get(token.type);
+            const value = parseFunction ? parseFunction(token) : token.value;
             return new GrammarForge.TokenNode(token.type, value);
-            return ['TOKEN', token.type, value];
         }
 
         symbol = (tokenStream, symbol) => {

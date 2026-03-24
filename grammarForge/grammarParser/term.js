@@ -112,15 +112,34 @@ GrammarForge.Term = class Term extends GrammarForge.Word {
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    setNonTerminalIndexs = (containsOptional) => {
-        if (this.type === "IDENTIFIER")
+    setKeptWordIndexs = (parser) => {
+        if (this.hasKeptWords)
             return 1;
 
-        return 0;
+        let count = 0;
+        switch (this.type) {
+            case "IDENTIFIER":
+                const rule = parser.getRule(this.value);
+                if (!rule)
+                    throw new Error(`No rule found for identifier ${this.value}`);
+
+                count = rule.setKeptWordIndexs(parser);
+                break;
+            case "TOKEN":
+                if (parser.parseTokenFunctions.get(this.value) || parser.tokenTags.get(this.value) === "KEEP")
+                    count = 1;
+
+                break;
+        }
+
+        if (count > 0)
+            this.hasKeptWords = true;
+
+        return count;
     }
 
-    getNonTerminalsFromIndexs = (containsOptional) => {
-        if (this.type === "IDENTIFIER")
+    getKeptWordsFromIndexs = (_) => {
+        if (this.hasKeptWords)
             return [ this ];
 
         return [];

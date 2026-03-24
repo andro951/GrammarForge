@@ -84,7 +84,7 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
         static tknDefSet = ["TOKEN"];
         static termSet = ["IDENTIFIER", "TOKEN", "SYMBOL"];
         static parSet = ["LPAREN"];
-        static oTypeSet = ["QUESTION", "STAR", "PLUS"];
+        static oTypeSet = ["QUESTION", "STAR", "PLUS", "ELLIPSIS"];
         static wordSet = GrammarParser.termSet.concat(GrammarParser.parSet);
 
         //stmt    : rule | tknDef
@@ -180,7 +180,7 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
                         throw new Error(`Metadata not allowed in this expression at index ${GrammarParser.index}`);
 
                     const token = GrammarParser.tokens[GrammarParser.index];
-                    if (token.type !== "IDENTIFIER" && token.type !== 'MATH_SYMBOL' && token.type !== "PLUS" && token.type !== "STAR")
+                    if (token.type !== "IDENTIFIER" && token.type !== 'MATH_SYMBOL' && token.type !== "TAG_OPEN" && token.type !== "TAG_CLOSE" && token.type !== "PLUS" && token.type !== "STAR")
                         throw new Error(`Unexpected token type in expression metadata: ${token.type}`);
 
                     GrammarParser.match(token.type);
@@ -201,29 +201,48 @@ tknDef  : TOKEN DEFINED_AS REGEX ((TOKEN | IDENTIFIER) | (LPAREN (TOKEN | IDENTI
             return expression;
         }
 
-        // wordBase: word
-        // | qWord
-        // qWord   : word oType
-        static wordBase() {
-            const wordNResult = GrammarParser.word();
-            if (wordNResult === undefined)
-                return undefined;
-
+        static qWordCheck(wordResult) {
             if (GrammarParser.index < GrammarParser.tokens.length) {
                 const token = GrammarParser.tokens[GrammarParser.index];
                 if (GrammarParser.oTypeSet.includes(token.type)) {
                     GrammarParser.match(token.type);
                     if (GrammarParser.index < GrammarParser.tokens.length) {
                         const nextToken = GrammarParser.tokens[GrammarParser.index];
-                        if (GrammarParser.oTypeSet.includes(nextToken.type))
-                            throw new Error(`Multiple oTypes in wordO are not allowed.`);
+                        if (nextToken.type === "TAG_OPEN") {
+                            if (token.type !== "ELLIPSIS")
+                                throw new Error(`<TAG> is only allowed after an ELLIPSIS (...).  Not allowed after a ${token.type} (${token.value}).  Found at index ${GrammarParser.index}`);
+
+                            GrammarParser.match("TAG_OPEN");
+                            const tagWordResult = GrammarParser.word();
+                            if (tagWordResult === undefined)
+                                throw new Error(`Expected word for tag, found ${nextToken.type} (${nextToken.value}).  Found at index ${GrammarParser.index}`);
+
+                            GrammarParser.match("TAG_CLOSE");
+
+                            const qWord = new GrammarForge.QWord(wordResult, token.type, tagWordResult);
+
+                            return this.qWordCheck(qWord);
+                        }
                     }
 
-                    return new GrammarForge.QWord(wordNResult, token.type);
+                    const qWord = new GrammarForge.QWord(wordResult, token.type);
+
+                    return this.qWordCheck(qWord);
                 }
             }
 
-            return wordNResult;
+            return wordResult;
+        }
+
+        // wordBase: word
+        // | qWord
+        // qWord   : word oType
+        static wordBase() {
+            const wordResult = GrammarParser.word();
+            if (wordResult === undefined)
+                return undefined;
+
+            return GrammarParser.qWordCheck(wordResult);
         }
 
         // word    : term

@@ -140,49 +140,61 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
         return parser.ruleTrySubFunctions[funcIndex];
     }
 
-    setNonTerminalIndexs = (containsOptional) => {
+    setKeptWordIndexs = (parser) => {
         const firstExpression = this.expressions[0];
-        const firstExpressionNonTerminalIndexesCount = firstExpression.setNonTerminalIndexs(containsOptional);
-        if (firstExpressionNonTerminalIndexesCount <= 0)
-            return 0;
+        const firstExpressionKeptWordIndexesCount = firstExpression.setKeptWordIndexs(parser);
 
         if (this.expressions.length === 1)
-            return firstExpressionNonTerminalIndexesCount;
+            return firstExpressionKeptWordIndexesCount;
 
-        return this.getNonTerminalsFromIndexs(containsOptional).length;
-    }
-
-    getNonTerminalsFromIndexs = (containsOptional) => {
-        const firstExpression = this.expressions[0];
-        const firstExpressionNonTerminals = firstExpression.getNonTerminalsFromIndexs(containsOptional);
-        for (const nonTerminal of firstExpressionNonTerminals) {
-            if (nonTerminal.value === undefined)
-                throw new Error(`Non-terminal in expression ${firstExpression.expressionString} has no value.`);
-        }
-
+        const hasRule = !!firstExpression.rule;
+        let anyHasKeptWords = firstExpressionKeptWordIndexesCount > 0;
         for (let i = 1; i < this.expressions.length; i++) {
             const expression = this.expressions[i];
-            const expressionNonTerminals = expression.getNonTerminalsFromIndexs(containsOptional);
-            let match = true;
-            if (expressionNonTerminals.length !== firstExpressionNonTerminals.length) {
-                match = false;
-            }
-            else {
-                for (let j = 0; j < firstExpressionNonTerminals.length; j++) {
-                    const firstNonTerminal = firstExpressionNonTerminals[j];
-                    const expressionNonTerminal = expressionNonTerminals[j];
-                    if (firstNonTerminal.value !== expressionNonTerminal.value) {
-                        match = false;
-                        break;
-                    }
-                }
+            const expressionKeptWordIndexesCount = expression.setKeptWordIndexs(parser);
+            if (hasRule) {
+                const expressionHasKeptWords = expressionKeptWordIndexesCount > 0;
+                anyHasKeptWords ||= expressionHasKeptWords;
+
+                continue;
             }
 
-            if (!match)
-                throw new Error(`All expressions in an ExpList must have the same non-terminals and they must be in the same order in each expression.  Expression 0 does not match expression ${i}.\nExpression 0 non-terminals: ${firstExpressionNonTerminals.map(nt => nt.toString()).join(", ")}\nExpression ${i} non-terminals: ${expressionNonTerminals.map(nt => nt.toString()).join(", ")}`);
+            if (expressionKeptWordIndexesCount !== firstExpressionKeptWordIndexesCount)
+                throw new Error(`All expressions in an ExpList must have the same number of kept words.  Expression 0 has ${firstExpressionKeptWordIndexesCount} kept words but expression ${i} has ${expressionKeptWordIndexesCount} kept words.`);
         }
 
-        return firstExpressionNonTerminals;
+        if (hasRule) {
+            return anyHasKeptWords ? 1 : 0;
+        }
+
+        const firstExpressionKeptWords = firstExpression.getKeptWordsFromIndexs();
+        for (const keptWord of firstExpressionKeptWords) {
+            if (keptWord.value === undefined)
+                throw new Error(`Non-terminal in expression ${firstExpression.expressionString} has no value.`);
+        }
+        
+        for (let i = 0; i < firstExpression.words.length; i++) {
+            const word1 = firstExpression.words[i];
+            for (let j = 1; j < this.expressions.length; j++) {
+                const expression = this.expressions[j];
+                const word2 = expression.words[i];
+                if (word1.type !== word2.type)
+                    throw new Error(`All expressions in an ExpList must have the same types of words in the same order.  Expression 0 word ${i} is type ${word1.type} but expression ${j} word ${i} is type ${word2.type}.`);
+
+                if (word1.type === "IDENTIFIER") {
+                    if (word1.value !== word2.value)
+                        throw new Error(`All expressions in an ExpList must have the same non-terminals in the same order.  Expression 0 word ${i} is non-terminal ${word1.value} but expression ${j} word ${i} is non-terminal ${word2.value}.`);
+                }
+            }
+        }
+
+        return firstExpressionKeptWordIndexesCount;
+    }
+
+    getKeptWordsFromIndexs = (containsOptional = false) => {
+        const firstExpression = this.expressions[0];
+        const firstExpressionKeptWords = firstExpression.getKeptWordsFromIndexs(containsOptional);
+        return firstExpressionKeptWords;
     }
 
     getChildren = (parser, childrenIndexSet) => {

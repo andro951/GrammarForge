@@ -24,16 +24,30 @@ ScriptForge.ScriptTestCase = class ScriptTestCase {
         const gf = sf.gf;
         gf.execution.testResults.length = 0;
 
-        // const downloadString = (text) => {
-        //     const blob = new Blob([text], { type: "text/plain" });
-        //     const a = document.createElement("a");
-        //     a.href = URL.createObjectURL(blob);
-        //     a.download = "log.txt";
-        //     a.click();
-        // }
-
         if (gf.execution.logAllTests) {
+            const arrToString = Array.prototype.toString;
+            let indentCount = 0;
+            Array.prototype.toString = function() {
+                if (!this)
+                    return '[]';
+
+                indentCount++;
+                const childIndent = ' '.repeat(indentCount);
+                const innerStr = this.map(x => `${childIndent}${x}`).join(',\n');
+                indentCount--;
+                return `Array: [\n${innerStr}\n${' '.repeat(indentCount)}]`;
+            }
+
+            // const downloadString = (text) => {
+            //     const blob = new Blob([text], { type: "text/plain" });
+            //     const a = document.createElement("a");
+            //     a.href = URL.createObjectURL(blob);
+            //     a.download = "log.txt";
+            //     a.click();
+            // }
+
             const astText = `${script.ast}`;
+            Array.prototype.toString = arrToString;
             console.log(astText);
             //downloadString(astText);
         }
