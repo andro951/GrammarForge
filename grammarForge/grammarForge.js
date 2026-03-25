@@ -99,6 +99,7 @@ const GrammarForge = class GrammarForge {
         this.grammar = grammar;
         this.functions = functions;
         this.argTokenDefinitions = tokenDefinitions;
+        this.allowFunctionRecursion = true;
         this.setup();
     }
 
@@ -145,7 +146,7 @@ const GrammarForge = class GrammarForge {
     }
 
     createExec = () => {
-        this.execution = new GrammarForge.Exec(this.parser, this.expressions, this.expressionByRuleNameThenExpressionStringLookup, this.functions);
+        this.execution = new GrammarForge.Exec(this, this.expressions, this.expressionByRuleNameThenExpressionStringLookup, this.functions);
     }
 
     parse = (str) => {
@@ -191,6 +192,11 @@ const GrammarForge = class GrammarForge {
 
     setParseTokenFunction = (tokenTag, func) => {
         this.parser.setParseTokenFunction(tokenTag, func);
+    }
+
+    disableRecursion = () => {
+        this.allowFunctionRecursion = false;
+        this.execution.disableRecursion();
     }
 };
 

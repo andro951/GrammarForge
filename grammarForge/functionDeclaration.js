@@ -1,7 +1,7 @@
 "use strict";
 
 GrammarForge.FunctionDeclaration = class FunctionDeclaration {
-    constructor(name, parameters, body, exec) {
+    constructor(name, parameters, body, exec, recursionAllowed = true) {
         if (!name)
             throw new Error("name is required");
 
@@ -29,6 +29,9 @@ GrammarForge.FunctionDeclaration = class FunctionDeclaration {
             throw new Error("exec must be an instance of GrammarForge.Exec");
 
         this.exec = exec;
+
+        if (!recursionAllowed)
+            this.checkRecursion(this.body);
     }
 
     call(args) {
@@ -52,5 +55,20 @@ GrammarForge.FunctionDeclaration = class FunctionDeclaration {
         exec.variables = savedScope;
 
         return result;
+    }
+
+    checkRecursion(item) {
+        if (Array.isArray(item)) {
+            for (const subItem of item) {
+                this.checkRecursion(subItem);
+            }
+        }
+        else if (item instanceof GrammarForge.ExpNode) {
+            this.checkRecursion(item.nodes);
+        }
+        else if (item instanceof GrammarForge.TokenNode) {
+            if (item.value === this.name)
+                throw new Error(`Recursion detected in function: ${this.name}.  Recursion is not allowed.`);
+        }
     }
 }

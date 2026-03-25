@@ -183,6 +183,9 @@ GrammarForge.Expression = class Expression {
                             case 'exp':
                                 //Do nothing for exp.
                                 break;
+                            case 'stmt_exp':
+                                //Do nothing for stmt_exp.
+                                break;
                             default:
                                 throw new Error(`No automatically generated function for expression with rule tag: ${this.rule.tag}`);
                         }
@@ -202,6 +205,11 @@ GrammarForge.Expression = class Expression {
                         case 'return':
                         case 'func_declare':
                         case 'func_call':
+                        case 'stmt_exp':
+                        case 'post_inc':
+                        case 'post_dec':
+                        case 'pre_inc':
+                        case 'pre_dec':
                             return new GrammarForge.ExpNode(this, result);
                         case 'par':
                             return result;
@@ -423,6 +431,10 @@ GrammarForge.Expression.tags = new Set([
     'func_declare',
     'func_call',
     'print',
+    'post_inc',
+    'post_dec',
+    'pre_inc',
+    'pre_dec',
     '+',
     '-',
     '*',

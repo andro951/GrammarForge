@@ -338,6 +338,38 @@ GrammarForge.Rule = class Rule {
                 }
 
                 break;
+            case 'post_inc': {
+                    const [ varIndex ] = this.getTaggedWordIndices(exec, expression, ['var'], tag);
+
+                    const defaultFunc = exec.defaultExecFunctions.get("post_inc");
+                    func = (varName) => defaultFunc(varName);
+                }
+
+                break;
+            case 'post_dec': {
+                    const [ varIndex ] = this.getTaggedWordIndices(exec, expression, ['var'], tag);
+
+                    const defaultFunc = exec.defaultExecFunctions.get("post_dec");
+                    func = (varName) => defaultFunc(varName);
+                }
+
+                break;
+            case 'pre_inc': {
+                    const [ varIndex ] = this.getTaggedWordIndices(exec, expression, ['var'], tag);
+
+                    const defaultFunc = exec.defaultExecFunctions.get("pre_inc");
+                    func = (varName) => defaultFunc(varName);
+                }
+
+                break;
+            case 'pre_dec': {
+                    const [ varIndex ] = this.getTaggedWordIndices(exec, expression, ['var'], tag);
+
+                    const defaultFunc = exec.defaultExecFunctions.get("pre_dec");
+                    func = (varName) => defaultFunc(varName);
+                }
+
+                break;
             case 'if' : {
                     const [ expIndex, stmtIndex, elseStmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt', 'stmt'], tag);
 
@@ -956,4 +988,5 @@ GrammarForge.Rule.tags = new Set([
     'exp',
     'var',
     'block',
+    'stmt_exp',
 ]);

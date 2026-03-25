@@ -2,8 +2,9 @@
 
 {
     GrammarForge.Exec = class {
-        constructor(parser, expressions, expressionByRuleNameThenExpressionStringLookup, functions = null) {
-            this.parser = parser;
+        constructor(grammarForge, expressions, expressionByRuleNameThenExpressionStringLookup, functions = null) {
+            this.gf = grammarForge;
+            this.parser = this.gf.parser;
             this.parser.exec = this;
             this.expressions = expressions;
             this.expressionByRuleNameThenExpressionStringLookup = expressionByRuleNameThenExpressionStringLookup;
@@ -15,6 +16,9 @@
             this.logAllTests = false;
             this.testResults = [];
             this.printArr = [];
+            if (!this.gf.allowFunctionRecursion)
+                this.disableRecursion();
+            
             this.setup(functions);
         }
 
@@ -29,6 +33,10 @@
                 const rule = this.parser.rules[i];
                 rule.checkMakeDefaultExecFunctions(this);
             }
+        }
+
+        disableRecursion() {
+            this.functionsOnStack = new Set();
         }
 
         markExpressionsInWordAsNotAutomaticallyGenerated = (word) => {
@@ -149,8 +157,9 @@
                     console.warn(`A rule was tagged as stmt:\n${this.stmt_rule.toString()}\nbut no rules were recognized as a statement list.  Statement lists should only look like (stmt)* or (stmt)+`);
             }
 
-            //func_call only in a stmt
-            if (this.stmt_rule !== undefined && this.metaExpressionLookup.has("func_call")) {
+            //stmt_exp in a stmt
+            const stmt_exp_rule = this.ruleTagLookup.get('stmt_exp');
+            if (this.stmt_rule !== undefined && stmt_exp_rule !== undefined) {
                 let found = false;
                 for (let j = 0; j < this.stmt_rule.expList.expressions.length; j++) {
                     const expr = this.stmt_rule.expList.expressions[j];
@@ -162,24 +171,23 @@
                             if (!rule)
                                 throw new Error(`No rule found for non-terminal: ${word.value}`);
 
-                            const ruleExpr = rule.expList.expressions[0];
-                            if (ruleExpr.tag !== "func_call")
+                            if (rule !== stmt_exp_rule)
                                 continue;
 
                             found = true;
                             if (expr.execFunc !== null) {
-                                console.warn(`A rule was tagged as stmt:\n${this.stmt_rule.toString()}\nbut the expression that looks like an exp only statement already has a user-defined exec function.  Skipping default exp only statement function generation for this expression:\n${expr.expressionString}`);
+                                console.warn(`A rule was tagged as stmt:\n${this.stmt_rule.toString()}\nbut the expression that looks like a stmt_exp statement already has a user-defined exec function.  Skipping default stmt_exp statement function generation for this expression:\n${expr.expressionString}`);
                                 continue;
                             }
 
-                            const func = this.defaultExecFunctions.get("exp only");
-                            expr.execFunc= (func_call) => func(func_call);
+                            const func = this.defaultExecFunctions.get("stmt_exp");
+                            expr.execFunc = (stmt_exp) => func(stmt_exp);
                         }
                     }
                 }
 
                 if (!found)
-                    console.warn(`A rule was tagged as stmt:\n${this.stmt_rule.toString()}\nbut no expressions were recognized as a func_call only statement.  There should usually be a statement that only contains a function call.`);
+                    throw new Error(`A rule was tagged as stmt:\n${this.stmt_rule.toString()}\nand a rule was tagged as stmt_exp:\n${stmt_exp_rule.toString()}\nbut no expressions in the stmt rule were recognized as a stmt_exp statement.  There should be an expression on the stmt rule that only contains only the rule name of the rule tagged stmt_exp.`);
             }
 
             Object.freeze(this.ruleTagLookup);
@@ -406,6 +414,9 @@
                 ['sl', (stmt_list) => {
                     for (const stmt of stmt_list) {
                         const result = stmt.exec();
+                        if (result.type === undefined)
+                            throw new Error(`Expected statement execution result to have a type property.  Found: ${result}`);
+
                         if (result.type !== GrammarForge.FlowControlID.NORMAL)
                             return result;
                     }
@@ -415,7 +426,7 @@
                 ['stmt', (stmt) => {
                     return stmt.exec();
                 }],
-                ['exp only', (exp) => {
+                ['stmt_exp', (exp) => {
                     exp.exec();
                     return GrammarForge.NORMAL_CONTROL;
                 }],
@@ -522,6 +533,30 @@
                     const v = var_.exec();
                     return get_variable(v);
                 }],
+                ['post_inc', (var_) => {
+                    const v = var_.exec();
+                    const oldValue = get_variable(v);
+                    set_variable(v, oldValue + 1);
+                    return oldValue;
+                }],
+                ['post_dec', (var_) => {
+                    const v = var_.exec();
+                    const oldValue = get_variable(v);
+                    set_variable(v, oldValue - 1);
+                    return oldValue;
+                }],
+                ['pre_inc', (var_) => {
+                    const v = var_.exec();
+                    const value = get_variable(v) + 1;
+                    set_variable(v, value);
+                    return value;
+                }],
+                ['pre_dec', (var_) => {
+                    const v = var_.exec();
+                    const value = get_variable(v) - 1;
+                    set_variable(v, value);
+                    return value;
+                }],
                 ['block', (stmt_list) => {
                     if (GrammarForge.debuggingFunctions) {
                         console.log(`block start`);
@@ -604,7 +639,8 @@
                         v,
                         parameters,
                         block,
-                        execution
+                        execution,
+                        execution.gf.allowFunctionRecursion
                     );
 
                     try_declare_then_set_variable(v, val);
@@ -617,6 +653,13 @@
                 }],
                 ['func_call', (var_, argsArr) => {
                     const v = var_.exec();
+                    if (execution.functionsOnStack) {
+                        if (execution.functionsOnStack.has(v))
+                            throw new Error(`Recursion detected. ${v} was called while another instance of ${v} is being executed. Recursion is not allowed.`);
+
+                        execution.functionsOnStack.add(v);
+                    }
+
                     const func = execution.get_variable(v);
                     if (!(func instanceof GrammarForge.FunctionDeclaration))
                         throw new Error(`Tried to call vairable as a function, but it is not a function: ${v}, type: ${type}, value: ${func}`);
@@ -624,6 +667,9 @@
                     let args = argsArr.map(arg => arg.exec());
 
                     const result = func.call(args);
+
+                    if (execution.functionsOnStack)
+                        execution.functionsOnStack.delete(v);
 
                     if (result instanceof GrammarForge.ReturnControl) {
                         return result.value;
