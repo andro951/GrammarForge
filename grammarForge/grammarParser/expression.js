@@ -193,31 +193,22 @@ GrammarForge.Expression = class Expression {
 
                     switch (this.tag) {
                         case 'declare':
-                            return new GrammarForge.ExpNode(this, result);
                         case 'get':
-                            return new GrammarForge.ExpNode(this, result);
                         case 'assign':
-                            return new GrammarForge.ExpNode(this, result);
                         case 'print':
-                            return new GrammarForge.ExpNode(this, result);
                         case 'while':
-                            return new GrammarForge.ExpNode(this, result);
                         case 'foreach':
-                            return new GrammarForge.ExpNode(this, result);
                         case 'if':
+                        case 'return':
+                        case 'func_declare':
+                        case 'func_call':
                             return new GrammarForge.ExpNode(this, result);
                         case 'par':
                             return result;
                         case 'continue':
-                            return new GrammarForge.ExpNode(this, undefined);
                         case 'break':
                             return new GrammarForge.ExpNode(this, undefined);
-                        case 'return':
-                            return new GrammarForge.ExpNode(this, result);
-                        case 'func_declare':
-                            return new GrammarForge.ExpNode(this, result);
-                        case 'func_call':
-                            return new GrammarForge.ExpNode(this, result);
+                        case 'ternary':
                         case null:
                             if (result.length === 1) {
                                 if (this.execFunc !== null) {
@@ -388,11 +379,11 @@ GrammarForge.Expression = class Expression {
         return count;
     }
 
-    getKeptWordsFromIndexs = (opTypes = null) => {
+    getKeptWordsFromIndexs = (oTypes = null) => {
         const keptWords = [];
         for (let i = 0; i < this.keptWordIndexes.length; i++) {
             const word = this.words[this.keptWordIndexes[i]];
-            keptWords.push(...word.getKeptWordsFromIndexs(opTypes));
+            keptWords.push(...word.getKeptWordsFromIndexs(oTypes));
         }
 
         return keptWords;
@@ -424,6 +415,7 @@ GrammarForge.Expression.tags = new Set([
     'foreach',
     'for',
     'if',//Assumes the first stmt is the if body and the second is the else body (if present)
+    'ternary',//Assumes the first exp is the condition, the second is the true case, and the third is the false case.
     'par',
     'break',
     'continue',

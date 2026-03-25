@@ -39,8 +39,8 @@ GrammarForge.Par = class Par extends GrammarForge.Word {
         return this.expList.setKeptWordIndexs(parser);
     }
 
-    getKeptWordsFromIndexs = (opTypes = null) => {
-        return this.expList.getKeptWordsFromIndexs(opTypes);
+    getKeptWordsFromIndexs = (oTypes = null) => {
+        return this.expList.getKeptWordsFromIndexs(oTypes);
     }
 
     getChildren = (parser, childrenIndexSet) => {

@@ -339,15 +339,20 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'if' : {
+                    const [ expIndex, stmtIndex, elseStmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt', 'stmt'], tag);
+
                     const defaultFunc = exec.defaultExecFunctions.get("if");
-                    try {
-                        const [ expIndex, stmtIndex, elseIfListIndex, elseStmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt', 'STAR', 'stmt'], tag);
-                        func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex], arr[elseIfListIndex], arr[elseStmtIndex]);
-                    }
-                    catch (e) {
-                        const [ expIndex, stmtIndex, elseStmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt', 'stmt'], tag);
-                        func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex], null, arr[elseStmtIndex]);
-                    }
+                    func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex], arr[elseStmtIndex]);
+                }
+
+                break;
+            case 'ternary' : {
+                    const [ firstIndex, exp1Index, exp2Index ] = this.getTaggedWordIndices(exec, expression, ['FIRST', 'exp', 'exp'], tag);
+                    if (firstIndex !== 0 || exp1Index !== 1 || exp2Index !== 2)
+                        throw new Error(`For the ternary tag, the indices are incorrect.  expression: ${expression.expressionString} in rule: ${this.name}`);
+
+                    const defaultFunc = exec.defaultExecFunctions.get("ternary");
+                    func = (arr) => defaultFunc(...arr);
                 }
 
                 break;
@@ -366,7 +371,7 @@ GrammarForge.Rule = class Rule {
         return rulesTags.map(rt => {
             const rule = exec.ruleTagLookup.get(rt);
             if (!rule) {
-                if (rt === 'QUESTION' || rt === 'PLUS' || rt === 'STAR')
+                if (rt === 'FIRST' || rt === 'QUESTION' || rt === 'PLUS' || rt === 'STAR')
                     return { name: rt };//Dummy rule for qWord
 
                 if (rt === 'ELLIPSIS') {
@@ -388,7 +393,25 @@ GrammarForge.Rule = class Rule {
     assignIndices(keptWords, rules, tag, expression) {
         const indices = Array(rules.length).fill(-1);
         const keptWordUsed = Array(keptWords.length).fill(false);
+
+        let firstIndex = -1;
+        for (let j = 0; j < rules.length; j++) {
+            const rule = rules[j];
+            if (rule.name === 'FIRST') {
+                firstIndex = j;
+                break;
+            }
+        }
+
+        if (firstIndex !== -1) {
+            indices[firstIndex] = 0;
+            keptWordUsed[0] = true;
+        }
+
         for (let i = 0; i < rules.length; i++) {
+            if (firstIndex === i)
+                continue;
+
             const rule = rules[i];
             for (let j = 0; j < keptWords.length; j++) {
                 if (keptWordUsed[j])
@@ -398,7 +421,7 @@ GrammarForge.Rule = class Rule {
                     const [ qWord, words ] = keptWords[j];
                     if (!(qWord instanceof GrammarForge.QWord))
                         throw new Error(`Found a ${tag} tag with an optional non-terminal, but the non-terminal is not a QWord: ${expression.expressionString}`);
-                    
+
                     indices[i] = j;
                     keptWordUsed[j] = true;
                     break;
@@ -433,15 +456,15 @@ GrammarForge.Rule = class Rule {
 
     getTaggedWordIndices(exec, expression, rulesTags, tag) {
         const rules = this.getRulesFromTags(exec, rulesTags, tag, expression);
-        let opTypes = new Set();
+        let oTypes = new Set();
         for (const rule of rules) {
             if (rule.name === 'QUESTION' || rule.name === 'PLUS' || rule.name === 'STAR') {
-                opTypes.add(rule.name);
+                oTypes.add(rule.name);
                 break;
             }
         }
 
-        const keptWords = expression.getKeptWordsFromIndexs(opTypes);
+        const keptWords = expression.getKeptWordsFromIndexs(oTypes);
         this.validateKeptWordsCount(keptWords, rules, tag, expression);
         return this.assignIndices(keptWords, rules, tag, expression);
     }

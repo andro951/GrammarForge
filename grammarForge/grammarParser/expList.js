@@ -191,9 +191,9 @@ GrammarForge.ExpList = class ExpList extends GrammarForge.Word {
         return firstExpressionKeptWordIndexesCount;
     }
 
-    getKeptWordsFromIndexs = (opTypes = null) => {
+    getKeptWordsFromIndexs = (oTypes = null) => {
         const firstExpression = this.expressions[0];
-        const firstExpressionKeptWords = firstExpression.getKeptWordsFromIndexs(opTypes);
+        const firstExpressionKeptWords = firstExpression.getKeptWordsFromIndexs(oTypes);
         return firstExpressionKeptWords;
     }
 

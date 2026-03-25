@@ -554,19 +554,11 @@
 
                     return GrammarForge.CONTINUE_CONTROL;
                 }],
-                ['if', (exp, stmt, else_if_clauses, else_stmt) => {
+                ['if', (exp, stmt, else_stmt) => {
                     if (exp.exec()) {
                         return stmt.exec();
                     }
                     else {
-                        if (else_if_clauses) {
-                            for (const [else_if_exp, else_if_stmt] of else_if_clauses) {
-                                if (else_if_exp.exec()) {
-                                    return else_if_stmt.exec();
-                                }
-                            }
-                        }
-
                         if (else_stmt.empty) {
                             return GrammarForge.NORMAL_CONTROL;
                         }
@@ -574,6 +566,9 @@
                             return else_stmt.exec();
                         }
                     }
+                }],
+                ['ternary', (exp, optional) => {
+                    return exp.exec() ? optional[0].exec() : optional[1].exec();
                 }],
                 ['print', (exp) => {
                     const val = exp.empty ? '' : exp.exec();

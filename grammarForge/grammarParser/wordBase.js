@@ -19,7 +19,7 @@ GrammarForge.WordBase = class WordBase {
         throw new Error("Not implemented");
     }
 
-    getKeptWordsFromIndexs = (opTypes = null) => {
+    getKeptWordsFromIndexs = (oTypes = null) => {
         throw new Error("Not implemented");
     }
 

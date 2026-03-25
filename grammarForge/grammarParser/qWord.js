@@ -321,14 +321,14 @@ GrammarForge.QWord = class QWord extends GrammarForge.Word {
         return keptWordsCount;
     }
 
-    getKeptWordsFromIndexs = (opTypes = null) => {
-        const keptWords = this.word.getKeptWordsFromIndexs(opTypes);
+    getKeptWordsFromIndexs = (oTypes = null) => {
+        const keptWords = this.word.getKeptWordsFromIndexs(oTypes);
         if (this.oType === 'ELLIPSIS') {
-            const delimiterKeptWords = this.delimiterWord ? this.delimiterWord.getKeptWordsFromIndexs(opTypes) : undefined;
+            const delimiterKeptWords = this.delimiterWord ? this.delimiterWord.getKeptWordsFromIndexs(oTypes) : undefined;
             return [ [ this, keptWords, delimiterKeptWords ] ];
         }
 
-        if (keptWords.length > 0 && opTypes?.has(this.oType))
+        if (keptWords.length > 0 && oTypes?.has(this.oType))
             return [ [ this, keptWords ] ];
 
         return keptWords;
