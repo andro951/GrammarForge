@@ -299,7 +299,7 @@ GrammarForge.Rule = class Rule {
                 break;
             case 'return': {
                     try {
-                        const [ optionalIndex ] = this.getTaggedWordIndices(exec, expression, ['optional'], tag);
+                        const [ optionalIndex ] = this.getTaggedWordIndices(exec, expression, ['QUESTION'], tag);
                         if (optionalIndex !== 0)
                             throw new Error(`For the return tag with an optional expression, the optional must be the first non-terminal in the expression.  expression: ${expression.expressionString} in rule: ${this.name}`);
 
@@ -323,7 +323,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'func_declare': {
-                    const [ varIndex, optionalIndex, blockIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'optional', 'block'], tag);
+                    const [ varIndex, optionalIndex, blockIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'QUESTION', 'block'], tag);
 
                     const defaultFunc = exec.defaultExecFunctions.get("func_declare");
                     func = (arr) => defaultFunc(arr[varIndex], arr[optionalIndex], arr[blockIndex]);
@@ -331,7 +331,7 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'func_call': {
-                    const [ varIndex, optionalIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'optional'], tag);
+                    const [ varIndex, optionalIndex ] = this.getTaggedWordIndices(exec, expression, ['var', 'QUESTION'], tag);
 
                     const defaultFunc = exec.defaultExecFunctions.get("func_call");
                     func = (arr) => defaultFunc(arr[varIndex], arr[optionalIndex]);
@@ -339,10 +339,15 @@ GrammarForge.Rule = class Rule {
 
                 break;
             case 'if' : {
-                    const [ expIndex, stmtIndex, elseStmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt', 'stmt'], tag);
-
                     const defaultFunc = exec.defaultExecFunctions.get("if");
-                    func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex], arr[elseStmtIndex]);
+                    try {
+                        const [ expIndex, stmtIndex, elseIfListIndex, elseStmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt', 'STAR', 'stmt'], tag);
+                        func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex], arr[elseIfListIndex], arr[elseStmtIndex]);
+                    }
+                    catch (e) {
+                        const [ expIndex, stmtIndex, elseStmtIndex ] = this.getTaggedWordIndices(exec, expression, ['exp', 'stmt', 'stmt'], tag);
+                        func = (arr) => defaultFunc(arr[expIndex], arr[stmtIndex], null, arr[elseStmtIndex]);
+                    }
                 }
 
                 break;
@@ -361,8 +366,12 @@ GrammarForge.Rule = class Rule {
         return rulesTags.map(rt => {
             const rule = exec.ruleTagLookup.get(rt);
             if (!rule) {
-                if (rt === 'optional')
-                    return { name: rt };//Dummy rule for optional qWord
+                if (rt === 'QUESTION' || rt === 'PLUS' || rt === 'STAR')
+                    return { name: rt };//Dummy rule for qWord
+
+                if (rt === 'ELLIPSIS') {
+                    throw new Error(`ELLIPSIS is always returned instead of its children.  It should not be used in the rulesTags for a tag.  expression: ${expression.expressionString}`);
+                }
 
                 throw new Error(`Found a ${tag} tag on expression: ${expression.expressionString}, but no rule tagged as ${rt} found.`);
             }
@@ -385,17 +394,11 @@ GrammarForge.Rule = class Rule {
                 if (keptWordUsed[j])
                     continue;
 
-                if (rule.name === 'optional') {
-                    if (!Array.isArray(keptWords[j]))
-                        continue;
-
+                if (Array.isArray(keptWords[j])) {
                     const [ qWord, words ] = keptWords[j];
                     if (!(qWord instanceof GrammarForge.QWord))
                         throw new Error(`Found a ${tag} tag with an optional non-terminal, but the non-terminal is not a QWord: ${expression.expressionString}`);
-
-                    if (qWord.oType !== 'QUESTION' && qWord.oType !== 'ELLIPSIS')
-                        throw new Error(`Found a ${tag} tag with an optional non-terminal, but the QWord is not a QUESTION or ELLIPSIS: ${expression.expressionString}`);
-
+                    
                     indices[i] = j;
                     keptWordUsed[j] = true;
                     break;
@@ -430,15 +433,15 @@ GrammarForge.Rule = class Rule {
 
     getTaggedWordIndices(exec, expression, rulesTags, tag) {
         const rules = this.getRulesFromTags(exec, rulesTags, tag, expression);
-        let containsOptional = false;
+        let opTypes = new Set();
         for (const rule of rules) {
-            if (rule.name === 'optional') {
-                containsOptional = true;
+            if (rule.name === 'QUESTION' || rule.name === 'PLUS' || rule.name === 'STAR') {
+                opTypes.add(rule.name);
                 break;
             }
         }
 
-        const keptWords = expression.getKeptWordsFromIndexs(containsOptional);
+        const keptWords = expression.getKeptWordsFromIndexs(opTypes);
         this.validateKeptWordsCount(keptWords, rules, tag, expression);
         return this.assignIndices(keptWords, rules, tag, expression);
     }

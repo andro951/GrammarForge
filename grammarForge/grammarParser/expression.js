@@ -388,11 +388,11 @@ GrammarForge.Expression = class Expression {
         return count;
     }
 
-    getKeptWordsFromIndexs = (containsOptional = false) => {
+    getKeptWordsFromIndexs = (opTypes = null) => {
         const keptWords = [];
         for (let i = 0; i < this.keptWordIndexes.length; i++) {
             const word = this.words[this.keptWordIndexes[i]];
-            keptWords.push(...word.getKeptWordsFromIndexs(containsOptional));
+            keptWords.push(...word.getKeptWordsFromIndexs(opTypes));
         }
 
         return keptWords;
